@@ -23,7 +23,7 @@ import {
   TextResponsesQueryDto,
   PaginatedTextResponsesDto,
   TextResponseItemDto,
-} from './dto/analytics.dto';
+} from './dto';
 
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',

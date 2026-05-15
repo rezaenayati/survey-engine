@@ -27,7 +27,7 @@ import {
   ExportFormat,
   TextResponsesQueryDto,
   PaginatedTextResponsesDto,
-} from './dto/analytics.dto';
+} from './dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
 

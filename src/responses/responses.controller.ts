@@ -20,7 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ResponsesService } from './responses.service';
-import { StartResponseDto, UpdateResponseDto } from './dto/response.dto';
+import { StartResponseDto, UpdateResponseDto } from './dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
 import {

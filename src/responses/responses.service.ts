@@ -16,7 +16,7 @@ import {
   PaginationQueryDto,
   PaginatedResponseDto,
 } from '../common/dto/pagination.dto';
-import { StartResponseDto, UpdateResponseDto } from './dto/response.dto';
+import { StartResponseDto, UpdateResponseDto } from './dto';
 import {
   ResponseValidatorService,
   LogicEngineService,
