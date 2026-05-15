@@ -155,6 +155,94 @@ describe('SchemaValidatorService', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // validateSchema — edge cases
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('validateSchema — edge cases', () => {
+    it('rejects non-string version field', () => {
+      const result = service.validateSchema({ version: 42, pages: [{ name: 'p1', elements: [{ name: 'q1', type: 'text' }] }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_VERSION_TYPE')).toBe(true);
+    });
+
+    it('rejects pages that is not an array', () => {
+      const result = service.validateSchema({ pages: 'not-an-array' });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_PAGES_TYPE')).toBe(true);
+    });
+
+    it('rejects a page that is not an object', () => {
+      const result = service.validateSchema({ pages: ['not-an-object'] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_PAGE_TYPE')).toBe(true);
+    });
+
+    it('rejects a page with missing questions/elements', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1' }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'MISSING_QUESTIONS')).toBe(true);
+    });
+
+    it('rejects elements that is not an array', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1', elements: 'bad' }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_QUESTIONS_TYPE')).toBe(true);
+    });
+
+    it('rejects a question that is not an object', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1', elements: ['not-an-object'] }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_QUESTION_TYPE')).toBe(true);
+    });
+
+    it('rejects a question with missing type', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1', elements: [{ name: 'q1' }] }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'MISSING_QUESTION_TYPE')).toBe(true);
+    });
+
+    it('rejects a question with non-string type', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1', elements: [{ name: 'q1', type: 99 }] }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_QUESTION_TYPE_TYPE')).toBe(true);
+    });
+
+    it('rejects a question with non-string title', () => {
+      const result = service.validateSchema({ pages: [{ name: 'p1', elements: [{ name: 'q1', type: 'text', title: 42 }] }] });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_QUESTION_TITLE_TYPE')).toBe(true);
+    });
+
+    it('rejects non-array choices on choice questions', () => {
+      const result = service.validateSchema({
+        pages: [{ name: 'p1', elements: [{ name: 'q1', type: 'radiogroup', choices: 'bad' }] }],
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_CHOICES_TYPE')).toBe(true);
+    });
+
+    it('accepts choice questions with an array choices', () => {
+      const result = service.validateSchema({
+        pages: [{ name: 'p1', elements: [{ name: 'q1', type: 'checkbox', choices: ['a', 'b'] }] }],
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('accepts rating / matrix without extra fields', () => {
+      const result = service.validateSchema({
+        pages: [{
+          name: 'p1',
+          elements: [
+            { name: 'q1', type: 'rating' },
+            { name: 'q2', type: 'matrix' },
+          ],
+        }],
+      });
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // extractPageIds
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -164,6 +252,65 @@ describe('SchemaValidatorService', () => {
         pages: [{ name: 'p1', elements: [] }, { id: 'p2', questions: [] }],
       } as never);
       expect(ids).toEqual(['p1', 'p2']);
+    });
+
+    it('returns empty array when pages is missing', () => {
+      expect(service.extractPageIds({} as never)).toEqual([]);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // getQuestionById
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('getQuestionById', () => {
+    it('finds question by name', () => {
+      const q = service.getQuestionById(minimalSchema as never, 'q1');
+      expect(q).toBeTruthy();
+      expect((q as Record<string, unknown>).name).toBe('q1');
+    });
+
+    it('finds question by id field', () => {
+      const schema = { pages: [{ name: 'p1', elements: [{ id: 'myq', type: 'text' }] }] };
+      const q = service.getQuestionById(schema as never, 'myq');
+      expect(q).toBeTruthy();
+    });
+
+    it('returns null when question not found', () => {
+      const q = service.getQuestionById(minimalSchema as never, 'nonexistent');
+      expect(q).toBeNull();
+    });
+
+    it('returns null when schema has no pages', () => {
+      const q = service.getQuestionById({} as never, 'q1');
+      expect(q).toBeNull();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // getPageById
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('getPageById', () => {
+    it('finds page by name', () => {
+      const page = service.getPageById(minimalSchema as never, 'page1');
+      expect(page).toBeTruthy();
+    });
+
+    it('finds page by id field', () => {
+      const schema = { pages: [{ id: 'mypage', elements: [] }] };
+      const page = service.getPageById(schema as never, 'mypage');
+      expect(page).toBeTruthy();
+    });
+
+    it('returns null/undefined when page not found', () => {
+      const page = service.getPageById(minimalSchema as never, 'nonexistent');
+      expect(page).toBeFalsy();
+    });
+
+    it('returns null when schema has no pages', () => {
+      const page = service.getPageById({} as never, 'p1');
+      expect(page).toBeNull();
     });
   });
 });

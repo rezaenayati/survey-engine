@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AggregationService } from '../../../src/analytics/aggregation.service';
 import { Response } from '../../../src/responses/entities/response.entity';
 import { ResponseStatus } from '../../../src/common/constants/status.constants';
-import { VersionMode } from '../../../src/analytics/dto';
+import { VersionMode, FilterOperator } from '../../../src/analytics/dto';
 import type { RequestContext } from '../../../src/common/interfaces/request-context.interface';
 import type { SelectQueryBuilder } from 'typeorm';
 
@@ -277,6 +277,111 @@ describe('AggregationService', () => {
       const result = await service.calculateFunnelDB(qb, 7);
 
       expect(result.dropOffRate).toBe(40);
+    });
+  });
+
+  // ── calculateTrendsDB ─────────────────────────────────────────────────────
+
+  describe('calculateTrendsDB', () => {
+    it('returns daily and weekly trend arrays', async () => {
+      const qb = createQbMock();
+      (qb.getRawMany as jest.Mock)
+        .mockResolvedValueOnce([
+          { date: '2026-05-01', count: '5', completed: '3' },
+          { date: '2026-05-02', count: '8', completed: '6' },
+        ])
+        .mockResolvedValueOnce([
+          { date: '2026-04-28', count: '13', completed: '9' },
+        ]);
+
+      const result = await service.calculateTrendsDB(qb);
+
+      expect(result.daily).toHaveLength(2);
+      expect(result.daily[0]).toEqual({ date: '2026-05-01', count: 5, completed: 3 });
+      expect(result.weekly).toHaveLength(1);
+      expect(result.weekly[0]).toEqual({ date: '2026-04-28', count: 13, completed: 9 });
+    });
+
+    it('returns empty arrays when no data', async () => {
+      const qb = createQbMock();
+      (qb.getRawMany as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.calculateTrendsDB(qb);
+
+      expect(result.daily).toHaveLength(0);
+      expect(result.weekly).toHaveLength(0);
+    });
+  });
+
+  // ── buildBaseQuery — answer filters ───────────────────────────────────────
+
+  describe('buildBaseQuery — answer filters', () => {
+    async function makeService() {
+      const repo = mockResponseRepo();
+      const module = await Test.createTestingModule({
+        providers: [
+          AggregationService,
+          { provide: getRepositoryToken(Response), useValue: repo },
+        ],
+      }).compile();
+      return { svc: module.get(AggregationService), repo };
+    }
+
+    const scalarCases: Array<{ operator: FilterOperator; label: string; expectedSql: string }> = [
+      { operator: FilterOperator.EQUALS, label: 'EQUALS', expectedSql: '= :answerFilter0' },
+      { operator: FilterOperator.CONTAINS, label: 'CONTAINS', expectedSql: 'ILIKE :answerFilter0' },
+      { operator: FilterOperator.GT, label: 'GT', expectedSql: '> :answerFilter0' },
+      { operator: FilterOperator.LT, label: 'LT', expectedSql: '< :answerFilter0' },
+      { operator: FilterOperator.GTE, label: 'GTE', expectedSql: '>= :answerFilter0' },
+      { operator: FilterOperator.LTE, label: 'LTE', expectedSql: '<= :answerFilter0' },
+    ];
+
+    for (const { operator, label, expectedSql } of scalarCases) {
+      it(`applies ${label} operator filter`, async () => {
+        const { svc, repo } = await makeService();
+
+        svc.buildBaseQuery(ctx, 'survey-1', {
+          answerFilters: [{ questionId: 'q1', operator, value: 'testval' }],
+        });
+
+        const allCalls = (repo._qb.andWhere as jest.Mock).mock.calls.map(([sql]: [string]) => sql);
+        expect(allCalls.some((s: string) => typeof s === 'string' && s.includes(expectedSql))).toBe(true);
+      });
+    }
+
+    it('applies NOT_EQUALS operator filter (uses Brackets)', async () => {
+      const { svc, repo } = await makeService();
+
+      svc.buildBaseQuery(ctx, 'survey-1', {
+        answerFilters: [{ questionId: 'q1', operator: FilterOperator.NOT_EQUALS, value: 'testval' }],
+      });
+
+      // NOT_EQUALS wraps conditions in Brackets, so andWhere is called with a Brackets object
+      expect(repo._qb.andWhere).toHaveBeenCalled();
+    });
+
+    it('applies IN operator with array value', async () => {
+      const { svc, repo } = await makeService();
+
+      svc.buildBaseQuery(ctx, 'survey-1', {
+        answerFilters: [{ questionId: 'q1', operator: FilterOperator.IN, value: ['a', 'b'] }],
+      });
+
+      const allCalls = (repo._qb.andWhere as jest.Mock).mock.calls.map(([sql]: [string]) => sql);
+      expect(allCalls.some((s: string) => s.includes('IN (:...answerFilter0)'))).toBe(true);
+    });
+
+    it('skips IN operator when value is not an array', async () => {
+      const { svc, repo } = await makeService();
+
+      svc.buildBaseQuery(ctx, 'survey-1', {
+        answerFilters: [{ questionId: 'q1', operator: FilterOperator.IN, value: 'not-array' }],
+      });
+
+      const allCalls = (repo._qb.andWhere as jest.Mock).mock.calls.map(([sql]: [string]) => sql);
+      expect(allCalls.some((s: string) => s.includes('IN (:...answerFilter0)'))).toBe(false);
     });
   });
 });

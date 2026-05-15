@@ -149,5 +149,158 @@ describe('SurveyVersionsService', () => {
       surveyRepo.findOne.mockResolvedValue(null);
       await expect(service.getRuntime(ctx, 's1')).rejects.toBeInstanceOf(NotFoundException);
     });
+
+    it('throws NotFoundException when active version row is missing', async () => {
+      surveyRepo.findOne.mockResolvedValue({ id: 's1', activeVersionId: 'v1' });
+      versionRepo.findOne.mockResolvedValue(null);
+      await expect(service.getRuntime(ctx, 's1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // getVersions / getVersion
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('getVersions', () => {
+    it('returns versions for owned survey', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'user-1' });
+      const versions = [{ id: 'v1', versionNumber: 1 }, { id: 'v2', versionNumber: 2 }];
+      versionRepo.find.mockResolvedValue(versions);
+
+      const result = await service.getVersions(ctx, 's1');
+
+      expect(result).toEqual(versions);
+      expect(versionRepo.find).toHaveBeenCalledWith({
+        where: { surveyId: 's1' },
+        order: { versionNumber: 'DESC' },
+      });
+    });
+
+    it('throws ForbiddenException when caller does not own the survey', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'other-user' });
+
+      await expect(service.getVersions(ctx, 's1')).rejects.toThrow('You do not have access');
+    });
+  });
+
+  describe('getVersion', () => {
+    it('returns a specific version', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'user-1' });
+      const version = { id: 'v2', surveyId: 's1', versionNumber: 2 };
+      versionRepo.findOne.mockResolvedValue(version);
+
+      const result = await service.getVersion(ctx, 's1', 'v2');
+      expect(result).toBe(version);
+    });
+
+    it('throws NotFoundException when version does not exist', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'user-1' });
+      versionRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getVersion(ctx, 's1', 'missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // validateSurvey
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('validateSurvey', () => {
+    it('returns schemaValid=true for a valid schema', async () => {
+      surveysService.findOne.mockResolvedValue({
+        id: 's1', createdBy: 'user-1',
+        draftSchemaJson: validSchema,
+        draftLogicJson: null,
+      });
+
+      const result = await service.validateSurvey(ctx, 's1');
+
+      expect(result.schemaValid).toBe(true);
+      expect(result.schemaErrors).toHaveLength(0);
+    });
+
+    it('returns schemaValid=false for an invalid schema', async () => {
+      surveysService.findOne.mockResolvedValue({
+        id: 's1', createdBy: 'user-1',
+        draftSchemaJson: { invalid: true },
+        draftLogicJson: null,
+      });
+
+      const result = await service.validateSurvey(ctx, 's1');
+
+      expect(result.schemaValid).toBe(false);
+    });
+
+    it('returns defaults when survey has no schema', async () => {
+      surveysService.findOne.mockResolvedValue({
+        id: 's1', createdBy: 'user-1',
+        draftSchemaJson: null,
+        draftLogicJson: null,
+      });
+
+      const result = await service.validateSurvey(ctx, 's1');
+
+      expect(result.schemaValid).toBe(false);
+      expect(result.logicValid).toBe(true);
+      expect(result.schemaErrors).toHaveLength(0);
+    });
+
+    it('throws ForbiddenException when caller does not own survey', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'other-user' });
+
+      await expect(service.validateSurvey(ctx, 's1')).rejects.toThrow('You do not have access');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // publish — ownership
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('publish — ownership', () => {
+    it('throws ForbiddenException when caller does not own the survey', async () => {
+      surveysService.findOne.mockResolvedValue({
+        id: 's1',
+        createdBy: 'other-user',
+        status: SurveyStatus.DRAFT,
+        draftSchemaJson: validSchema,
+      });
+
+      await expect(service.publish(ctx, 's1')).rejects.toThrow('You do not have access');
+    });
+
+    it('throws BadRequestException when schema fails validation on publish', async () => {
+      surveysService.findOne.mockResolvedValue({
+        id: 's1',
+        createdBy: 'user-1',
+        status: SurveyStatus.DRAFT,
+        draftSchemaJson: { bad: 'schema' },
+        draftLogicJson: null,
+      });
+
+      await expect(service.publish(ctx, 's1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // evaluateLogic
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('evaluateLogic', () => {
+    it('returns logic evaluation for given answers', async () => {
+      surveyRepo.findOne.mockResolvedValue({ id: 's1', activeVersionId: 'v1' });
+      versionRepo.findOne.mockResolvedValue({ id: 'v1', schemaJson: validSchema, logicJson: null });
+
+      const result = await service.evaluateLogic(ctx, 's1', { q1: 'hello' });
+
+      expect(Array.isArray(result.visibleQuestions)).toBe(true);
+      expect(Array.isArray(result.hiddenQuestions)).toBe(true);
+      expect(typeof result.calculatedValues).toBe('object');
+    });
+
+    it('throws BadRequestException when survey has no published version', async () => {
+      surveyRepo.findOne.mockResolvedValue({ id: 's1', activeVersionId: null });
+
+      await expect(service.evaluateLogic(ctx, 's1', {})).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

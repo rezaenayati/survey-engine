@@ -168,5 +168,226 @@ describe('ResponsesService', () => {
       responseRepo.findOne.mockResolvedValue({ id: 'r1', status: ResponseStatus.COMPLETED, surveyVersionId: 'v1', answersJson: {} });
       await expect(service.complete(ctx, 'r1')).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('throws NotFoundException when survey version not found', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        status: ResponseStatus.IN_PROGRESS,
+        surveyVersionId: 'missing-version',
+        answersJson: {},
+      });
+      versionRepo.findOne.mockResolvedValue(null);
+      await expect(service.complete(ctx, 'r1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws ForbiddenException when a different user tries to complete', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        status: ResponseStatus.IN_PROGRESS,
+        surveyVersionId: 'version-1',
+        respondentId: 'other-user',
+        surveyId: 's1',
+        answersJson: {},
+      });
+      await expect(service.complete(ctx, 'r1')).rejects.toThrow('Only the original respondent');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // findAll
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('findAll', () => {
+    it('scopes to respondentId when no surveyId provided', async () => {
+      responseRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(ctx, {});
+
+      expect(responseRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ respondentId: 'user-1' }) }),
+      );
+    });
+
+    it('scopes to surveyId when provided and caller owns the survey', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'user-1', settings: {}, activeVersionId: null });
+      responseRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(ctx, { surveyId: 's1' });
+
+      expect(responseRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ surveyId: 's1' }) }),
+      );
+    });
+
+    it('throws ForbiddenException when caller does not own the survey', async () => {
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'other-user', settings: {}, activeVersionId: null });
+
+      await expect(service.findAll(ctx, { surveyId: 's1' })).rejects.toThrow('You do not have access');
+    });
+
+    it('returns paginated metadata', async () => {
+      responseRepo.findAndCount.mockResolvedValue([
+        [{ id: 'r1' }, { id: 'r2' }],
+        45,
+      ]);
+
+      const result = await service.findAll(ctx, { page: 2, limit: 20 });
+
+      expect(result.meta.total).toBe(45);
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.totalPages).toBe(3);
+      expect(result.data).toHaveLength(2);
+    });
+
+    it('filters by status when provided', async () => {
+      responseRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(ctx, { status: ResponseStatus.COMPLETED });
+
+      expect(responseRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ status: ResponseStatus.COMPLETED }) }),
+      );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // remove
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('remove', () => {
+    it('removes response when caller is the respondent', async () => {
+      responseRepo.findOne.mockResolvedValue({ id: 'r1', respondentId: 'user-1' });
+
+      await service.remove(ctx, 'r1');
+
+      expect(responseRepo.remove).toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when caller is not the respondent', async () => {
+      // findOne will check: respondentId !== userId → survey ownership check → survey also owned by other-user → 403
+      responseRepo.findOne.mockResolvedValue({ id: 'r1', respondentId: 'other-user', surveyId: 's1' });
+      surveysService.findOne.mockResolvedValue({ id: 's1', createdBy: 'other-user', settings: {}, activeVersionId: null });
+
+      await expect(service.remove(ctx, 'r1')).rejects.toThrow('You do not have access');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // validate
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('validate', () => {
+    it('returns valid=true when all required questions are answered', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        respondentId: 'user-1',
+        surveyVersionId: 'version-1',
+        answersJson: { q1: 'answer' },
+      });
+
+      const result = await service.validate(ctx, 'r1');
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('throws NotFoundException when version is missing', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        respondentId: 'user-1',
+        surveyVersionId: 'bad-version',
+        answersJson: {},
+      });
+      versionRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.validate(ctx, 'r1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('returns visibleQuestions and hiddenQuestions', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        respondentId: 'user-1',
+        surveyVersionId: 'version-1',
+        answersJson: {},
+      });
+
+      const result = await service.validate(ctx, 'r1');
+
+      expect(Array.isArray(result.visibleQuestions)).toBe(true);
+      expect(Array.isArray(result.hiddenQuestions)).toBe(true);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // evaluateLogic
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('evaluateLogic', () => {
+    it('returns logic evaluation result for response answers', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        respondentId: 'user-1',
+        surveyVersionId: 'version-1',
+        answersJson: { q1: 'test' },
+      });
+
+      const result = await service.evaluateLogic(ctx, 'r1');
+
+      expect(Array.isArray(result.visibleQuestions)).toBe(true);
+      expect(Array.isArray(result.visiblePages)).toBe(true);
+      expect(typeof result.calculatedValues).toBe('object');
+    });
+
+    it('throws NotFoundException when version is missing', async () => {
+      responseRepo.findOne.mockResolvedValue({
+        id: 'r1',
+        respondentId: 'user-1',
+        surveyVersionId: 'bad-version',
+        answersJson: {},
+      });
+      versionRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.evaluateLogic(ctx, 'r1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // start — webhook
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('start — webhook', () => {
+    it('fires response.started webhook after saving', async () => {
+      const webhookService = { fire: jest.fn() };
+
+      // Re-create module with captured webhookService
+      const { Test: TestNest } = await import('@nestjs/testing');
+      const { SchemaValidatorService } = await import('../../../src/schema/services/schema-validator.service');
+      const { LogicEngineService } = await import('../../../src/schema/services/logic-engine.service');
+      const { ResponseValidatorService } = await import('../../../src/schema/services/response-validator.service');
+      const { getRepositoryToken: grt } = await import('@nestjs/typeorm');
+
+      const localRepoR = makeResponseRepo({ save: jest.fn().mockResolvedValue({ id: 'r2', surveyId: 's1', respondentId: 'user-1', answersJson: {} }) });
+      const localVR = { findOne: jest.fn().mockResolvedValue(activeVersion) };
+      const localSurveys = { findOne: jest.fn().mockResolvedValue({ id: 's1', settings: { webhookUrl: 'http://x', webhookEvents: ['response.started'] }, activeVersionId: 'version-1' }) };
+
+      const m = await TestNest.createTestingModule({
+        providers: [
+          ResponsesService,
+          SchemaValidatorService, LogicEngineService, ResponseValidatorService,
+          { provide: grt(Response), useValue: localRepoR },
+          { provide: grt(SurveyVersion), useValue: localVR },
+          { provide: SurveysService, useValue: localSurveys },
+          { provide: WebhookService, useValue: webhookService },
+        ],
+      }).compile();
+
+      const svc = m.get(ResponsesService);
+      await svc.start(ctx, { surveyId: 's1' });
+
+      expect(webhookService.fire).toHaveBeenCalledWith(
+        expect.objectContaining({ webhookUrl: 'http://x' }),
+        expect.objectContaining({ event: 'response.started' }),
+      );
+    });
   });
 });

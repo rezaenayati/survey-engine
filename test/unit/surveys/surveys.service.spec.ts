@@ -118,6 +118,146 @@ describe('SurveysService', () => {
       surveyRepo.findOne.mockResolvedValue({ id: 's1', status: SurveyStatus.ARCHIVED });
       await expect(service.update(ctx, 's1', { name: 'New' })).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('throws BadRequestException when new schema is invalid', async () => {
+      surveyRepo.findOne.mockResolvedValue({
+        id: 's1', status: SurveyStatus.DRAFT,
+        draftSchemaJson: validSchema, draftLogicJson: null, settings: {},
+      });
+
+      await expect(
+        service.update(ctx, 's1', { schemaJson: {} as never }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws ForbiddenException when caller does not own the survey', async () => {
+      surveyRepo.findOne.mockResolvedValue({ id: 's1', status: SurveyStatus.DRAFT, createdBy: 'other-user' });
+
+      await expect(service.update(ctx, 's1', { name: 'New' })).rejects.toThrow('You do not have access');
+    });
+
+    it('merges settings rather than replacing them', async () => {
+      const existing = {
+        id: 's1', status: SurveyStatus.DRAFT, createdBy: 'user-1',
+        draftSchemaJson: null, draftLogicJson: null,
+        settings: { allowAnonymous: true, requireAuth: false, webhookUrl: 'http://old' },
+      };
+      surveyRepo.findOne.mockResolvedValue(existing);
+      surveyRepo.save.mockImplementation(async (s) => s);
+
+      await service.update(ctx, 's1', { settings: { webhookUrl: 'http://new' } as never });
+
+      expect(surveyRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            allowAnonymous: true,
+            webhookUrl: 'http://new',
+          }),
+        }),
+      );
+    });
   });
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // findAll
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('findAll', () => {
+    it('returns only own surveys for authenticated user', async () => {
+      surveyRepo.findAndCount.mockResolvedValue([[{ id: 's1' }], 1]);
+
+      await service.findAll(ctx, {});
+
+      expect(surveyRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { createdBy: 'user-1' } }),
+      );
+    });
+
+    it('returns only published surveys for unauthenticated user', async () => {
+      const anonCtx = { correlationId: 'c1' };
+      surveyRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.findAll(anonCtx, {});
+
+      expect(surveyRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { status: SurveyStatus.PUBLISHED } }),
+      );
+    });
+
+    it('returns paginated metadata', async () => {
+      surveyRepo.findAndCount.mockResolvedValue([[{ id: 's1' }, { id: 's2' }], 55]);
+
+      const result = await service.findAll(ctx, { page: 2, limit: 10 });
+
+      expect(result.meta.total).toBe(55);
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.totalPages).toBe(6);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // remove
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('remove', () => {
+    it('removes survey when caller is owner', async () => {
+      const survey = { id: 's1', createdBy: 'user-1', status: SurveyStatus.DRAFT };
+      surveyRepo.findOne.mockResolvedValue(survey);
+
+      await service.remove(ctx, 's1');
+
+      expect(surveyRepo.remove).toHaveBeenCalledWith(survey);
+    });
+
+    it('throws ForbiddenException when caller does not own the survey', async () => {
+      surveyRepo.findOne.mockResolvedValue({ id: 's1', createdBy: 'other-user' });
+
+      await expect(service.remove(ctx, 's1')).rejects.toThrow('You do not have access');
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // assertOwner
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('assertOwner', () => {
+    it('does not throw when caller matches owner', () => {
+      const survey = { id: 's1', createdBy: 'user-1' } as never;
+      expect(() => service.assertOwner(survey, ctx)).not.toThrow();
+    });
+
+    it('throws ForbiddenException when owner differs from caller', () => {
+      const survey = { id: 's1', createdBy: 'other' } as never;
+      expect(() => service.assertOwner(survey, ctx)).toThrow('You do not have access');
+    });
+
+    it('does not throw when survey has no owner (ownerless resource)', () => {
+      const survey = { id: 's1', createdBy: null } as never;
+      expect(() => service.assertOwner(survey, ctx)).not.toThrow();
+    });
+
+    it('does not throw when caller has no userId (anonymous)', () => {
+      const survey = { id: 's1', createdBy: 'someone' } as never;
+      expect(() => service.assertOwner(survey, { correlationId: 'c' })).not.toThrow();
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // create — with logicJson
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('create — with logicJson', () => {
+    it('allows creating a survey without a schema', async () => {
+      surveyRepo.save.mockResolvedValue({ id: 's2', name: 'No schema', status: SurveyStatus.DRAFT });
+
+      const result = await service.create(ctx, { name: 'No schema' });
+      expect(result.status).toBe(SurveyStatus.DRAFT);
+    });
+
+    it('creates survey with null createdBy for anonymous context', async () => {
+      surveyRepo.save.mockResolvedValue({ id: 's3', createdBy: null });
+      await service.create({ correlationId: 'c' }, { name: 'Anon' });
+      expect(surveyRepo.create).toHaveBeenCalledWith(expect.objectContaining({ createdBy: null }));
+    });
+  });
 });
