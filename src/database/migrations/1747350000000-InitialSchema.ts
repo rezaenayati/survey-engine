@@ -4,14 +4,17 @@ export class InitialSchema1747350000000 implements MigrationInterface {
   name = 'InitialSchema1747350000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // surveys_status enum
+    // surveys_status enum — DO block tolerates "already exists" from a prior synchronize run
     await queryRunner.query(`
-      CREATE TYPE "public"."surveys_status_enum" AS ENUM('draft', 'published', 'archived')
+      DO $$ BEGIN
+        CREATE TYPE "public"."surveys_status_enum" AS ENUM('draft', 'published', 'archived');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
 
     // surveys table
     await queryRunner.query(`
-      CREATE TABLE "surveys" (
+      CREATE TABLE IF NOT EXISTS "surveys" (
         "id"              uuid              NOT NULL DEFAULT uuid_generate_v4(),
         "createdBy"       character varying(255),
         "name"            character varying(255) NOT NULL,
@@ -27,12 +30,12 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_surveys_status"     ON "surveys" ("status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_surveys_createdAt"  ON "surveys" ("createdAt")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_surveys_status"    ON "surveys" ("status")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_surveys_createdAt" ON "surveys" ("createdAt")`);
 
     // survey_versions table
     await queryRunner.query(`
-      CREATE TABLE "survey_versions" (
+      CREATE TABLE IF NOT EXISTS "survey_versions" (
         "id"            uuid    NOT NULL DEFAULT uuid_generate_v4(),
         "surveyId"      uuid    NOT NULL,
         "versionNumber" integer NOT NULL,
@@ -46,31 +49,40 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_survey_versions_surveyId"             ON "survey_versions" ("surveyId")`);
-    await queryRunner.query(`CREATE INDEX "IDX_survey_versions_surveyId_versionNumber" ON "survey_versions" ("surveyId", "versionNumber")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId"              ON "survey_versions" ("surveyId")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId_versionNumber" ON "survey_versions" ("surveyId", "versionNumber")`);
 
     // FK: surveys.activeVersionId → survey_versions.id (SET NULL on delete)
     await queryRunner.query(`
-      ALTER TABLE "surveys"
-        ADD CONSTRAINT "FK_surveys_activeVersionId"
-        FOREIGN KEY ("activeVersionId") REFERENCES "survey_versions"("id") ON DELETE SET NULL
+      DO $$ BEGIN
+        ALTER TABLE "surveys"
+          ADD CONSTRAINT "FK_surveys_activeVersionId"
+          FOREIGN KEY ("activeVersionId") REFERENCES "survey_versions"("id") ON DELETE SET NULL;
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
 
     // FK: survey_versions.surveyId → surveys.id (CASCADE on delete)
     await queryRunner.query(`
-      ALTER TABLE "survey_versions"
-        ADD CONSTRAINT "FK_survey_versions_surveyId"
-        FOREIGN KEY ("surveyId") REFERENCES "surveys"("id") ON DELETE CASCADE
+      DO $$ BEGIN
+        ALTER TABLE "survey_versions"
+          ADD CONSTRAINT "FK_survey_versions_surveyId"
+          FOREIGN KEY ("surveyId") REFERENCES "surveys"("id") ON DELETE CASCADE;
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
 
     // responses_status enum
     await queryRunner.query(`
-      CREATE TYPE "public"."responses_status_enum" AS ENUM('started', 'in_progress', 'completed', 'abandoned')
+      DO $$ BEGIN
+        CREATE TYPE "public"."responses_status_enum" AS ENUM('started', 'in_progress', 'completed', 'abandoned');
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
 
     // responses table
     await queryRunner.query(`
-      CREATE TABLE "responses" (
+      CREATE TABLE IF NOT EXISTS "responses" (
         "id"              uuid    NOT NULL DEFAULT uuid_generate_v4(),
         "surveyId"        uuid    NOT NULL,
         "surveyVersionId" uuid    NOT NULL,
@@ -85,19 +97,25 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX "IDX_responses_surveyId_status"  ON "responses" ("surveyId", "status")`);
-    await queryRunner.query(`CREATE INDEX "IDX_responses_surveyVersionId"   ON "responses" ("surveyVersionId")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_responses_surveyId_status" ON "responses" ("surveyId", "status")`);
+    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_responses_surveyVersionId"  ON "responses" ("surveyVersionId")`);
 
     await queryRunner.query(`
-      ALTER TABLE "responses"
-        ADD CONSTRAINT "FK_responses_surveyId"
-        FOREIGN KEY ("surveyId") REFERENCES "surveys"("id") ON DELETE CASCADE
+      DO $$ BEGIN
+        ALTER TABLE "responses"
+          ADD CONSTRAINT "FK_responses_surveyId"
+          FOREIGN KEY ("surveyId") REFERENCES "surveys"("id") ON DELETE CASCADE;
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
 
     await queryRunner.query(`
-      ALTER TABLE "responses"
-        ADD CONSTRAINT "FK_responses_surveyVersionId"
-        FOREIGN KEY ("surveyVersionId") REFERENCES "survey_versions"("id") ON DELETE CASCADE
+      DO $$ BEGIN
+        ALTER TABLE "responses"
+          ADD CONSTRAINT "FK_responses_surveyVersionId"
+          FOREIGN KEY ("surveyVersionId") REFERENCES "survey_versions"("id") ON DELETE CASCADE;
+      EXCEPTION WHEN duplicate_object THEN null;
+      END $$
     `);
   }
 
