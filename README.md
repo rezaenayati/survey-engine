@@ -1,5 +1,15 @@
 # Survey Engine
 
+[![CI](https://github.com/your-org/survey-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/survey-engine/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)](https://github.com/your-org/survey-engine/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=nodedotjs&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
+
 > **Not affiliated with or endorsed by SurveyJS / Devsoft Baltic OÜ.**
 
 A self-hostable backend for [SurveyJS](https://surveyjs.io/). Stores survey definitions as SurveyJS-native JSON, collects responses, and serves analytics — all as a plain REST API.
