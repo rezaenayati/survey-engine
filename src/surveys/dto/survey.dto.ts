@@ -3,65 +3,65 @@ import { SurveyStatus } from '../../common/constants/status.constants';
 import type { SurveySettings } from '../entities/survey.entity';
 
 export class SurveyDto {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  createdBy: string;
+    @ApiProperty()
+    createdBy: string;
 
-  @ApiProperty()
-  name: string;
+    @ApiProperty()
+    name: string;
 
-  @ApiPropertyOptional()
-  description: string | null;
+    @ApiPropertyOptional()
+    description: string | null;
 
-  @ApiProperty({ enum: SurveyStatus })
-  status: SurveyStatus;
+    @ApiProperty({ enum: SurveyStatus })
+    status: SurveyStatus;
 
-  @ApiPropertyOptional()
-  activeVersionId: string | null;
+    @ApiPropertyOptional()
+    activeVersionId: string | null;
 
-  @ApiPropertyOptional()
-  draftSchemaJson: Record<string, unknown> | null;
+    @ApiPropertyOptional()
+    draftSchemaJson: Record<string, unknown> | null;
 
-  @ApiPropertyOptional()
-  draftLogicJson: Record<string, unknown> | null;
+    @ApiPropertyOptional()
+    draftLogicJson: Record<string, unknown> | null;
 
-  @ApiProperty()
-  settings: SurveySettings;
+    @ApiProperty()
+    settings: SurveySettings;
 
-  @ApiProperty()
-  createdAt: Date;
+    @ApiProperty()
+    createdAt: Date;
 
-  @ApiProperty()
-  updatedAt: Date;
+    @ApiProperty()
+    updatedAt: Date;
 }
 
 export class SurveyVersionDto {
-  @ApiProperty()
-  id: string;
+    @ApiProperty()
+    id: string;
 
-  @ApiProperty()
-  surveyId: string;
+    @ApiProperty()
+    surveyId: string;
 
-  @ApiProperty()
-  versionNumber: number;
+    @ApiProperty()
+    versionNumber: number;
 
-  @ApiProperty()
-  schemaJson: Record<string, unknown>;
+    @ApiProperty()
+    schemaJson: Record<string, unknown>;
 
-  @ApiPropertyOptional()
-  logicJson: Record<string, unknown> | null;
+    @ApiPropertyOptional()
+    logicJson: Record<string, unknown> | null;
 
-  @ApiProperty()
-  publishedBy: string;
+    @ApiProperty()
+    publishedBy: string;
 
-  @ApiProperty()
-  checksum: string;
+    @ApiProperty()
+    checksum: string;
 
-  @ApiProperty()
-  isDeprecated: boolean;
+    @ApiProperty()
+    isDeprecated: boolean;
 
-  @ApiProperty()
-  createdAt: Date;
+    @ApiProperty()
+    createdAt: Date;
 }

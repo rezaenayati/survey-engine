@@ -9,9 +9,9 @@ import { SurveyVersionsService } from './survey-versions.service';
 import { SchemaModule } from '../schema/schema.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Survey, SurveyVersion]), SchemaModule],
-  controllers: [SurveysController, SurveyVersionsController],
-  providers: [SurveysService, SurveyVersionsService],
-  exports: [SurveysService, SurveyVersionsService],
+    imports: [TypeOrmModule.forFeature([Survey, SurveyVersion]), SchemaModule],
+    controllers: [SurveysController, SurveyVersionsController],
+    providers: [SurveysService, SurveyVersionsService],
+    exports: [SurveysService, SurveyVersionsService],
 })
 export class SurveysModule {}
