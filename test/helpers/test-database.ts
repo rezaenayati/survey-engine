@@ -43,6 +43,13 @@ export async function startTestDatabase(): Promise<{
   };
 }
 
+export function getDataSource(): DataSource {
+  if (!dataSource?.isInitialized) {
+    throw new Error('Test database has not been started yet');
+  }
+  return dataSource;
+}
+
 export async function stopTestDatabase(): Promise<void> {
   if (dataSource?.isInitialized) {
     await dataSource.destroy();
