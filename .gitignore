@@ -24,3 +24,6 @@ coverage
 # Logs
 *.log
 logs/
+
+# Private dev notes — TODOs, scratch pads, internal docs (not for public repo)
+.dev/

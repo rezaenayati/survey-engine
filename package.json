@@ -2,7 +2,7 @@
   "name": "survey-engine",
   "version": "1.0.0",
   "description": "Survey Engine — a standalone SurveyJS-compatible survey service",
-  "author": "",
+  "author": "enayatii.reza@gmail.com",
   "private": true,
   "license": "MIT",
   "scripts": {
