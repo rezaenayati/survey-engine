@@ -42,11 +42,10 @@ Initial public release.
 **Developer experience**
 - OpenAPI / Swagger docs at `/api/docs`
 - `@survey-engine/sdk` — TypeScript client with full type coverage
-- 78 unit tests (jest) and integration tests (testcontainers/PostgreSQL)
+- 259 unit tests (jest) and integration tests (testcontainers/PostgreSQL)
 - GitHub Actions CI: lint, build, unit tests with coverage, integration tests
 - Docker Compose for local development
-- Example: Express backend integration (`examples/express-backend/`)
-- Example: React + SurveyJS frontend (`examples/react-frontend/`)
+- Example: full-stack Next.js app with SurveyJS Creator, survey-taking, and analytics (`examples/nextjs/`)
 - `CONTRIBUTING.md`, `SECURITY.md`, and this `CHANGELOG.md`
 
 ---

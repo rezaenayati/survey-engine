@@ -62,6 +62,7 @@ Leave `API_KEY` unset only when the service is deployed behind a gateway that al
 | `CORS_ORIGINS` | No (`*`) | Comma-separated allowed origins |
 | `THROTTLE_TTL` | No (60) | Rate-limit window in seconds |
 | `THROTTLE_LIMIT` | No (100) | Max requests per window |
+| `WEBHOOK_SECRET` | No | Global HMAC-SHA256 signing secret for webhooks (per-survey secret takes priority) |
 | `LOG_LEVEL` | No (info) | `trace` / `debug` / `info` / `warn` / `error` |
 
 ### 4. Run migrations

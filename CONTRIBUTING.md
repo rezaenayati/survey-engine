@@ -52,7 +52,7 @@ npm run test:cov
 npm run test:e2e
 ```
 
-Unit tests live alongside source files as `*.spec.ts`. Integration tests live in `test/`.
+Unit tests live in `test/unit/` mirroring the `src/` folder structure. Integration tests live in `test/integration/`.
 
 ---
 
@@ -66,15 +66,19 @@ src/
 ├── database/
 │   ├── typeorm.config.ts  TypeORM CLI config
 │   └── migrations/        Database migrations
-├── surveys/               Survey CRUD, versioning, publishing, analytics
-├── responses/             Response collection
-├── validation/            Logic engine, schema validator, response validator
+├── surveys/               Survey CRUD and versioning (publishing, runtime, logic evaluation)
+├── responses/             Response collection (start, save, complete, validate)
+├── analytics/             Analytics facade + aggregation, question analytics, export
+├── schema/                Logic engine, schema validator, response validator
+├── webhooks/              Webhook delivery with HMAC signing and retry logic
 └── health/                Liveness + readiness endpoints
 
 sdk/                       npm package (@survey-engine/sdk)
 docs/                      In-depth documentation
-examples/                  Runnable examples
-test/                      Integration (e2e) tests
+examples/nextjs/           Full-stack Next.js example (SurveyJS Creator + survey-taking + analytics)
+test/
+├── unit/                  Unit tests (jest) — mirrors src/ structure
+└── integration/           Integration (e2e) tests (testcontainers/PostgreSQL)
 ```
 
 ---
