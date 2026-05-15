@@ -1,5 +1,12 @@
 # Survey Engine
 
+[![CI](https://github.com/your-org/survey-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/survey-engine/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)](https://github.com/your-org/survey-engine/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org)
+[![Docker](https://img.shields.io/badge/docker-ready-blue)](docker-compose.yml)
+
 > **Not affiliated with or endorsed by SurveyJS / Devsoft Baltic OÜ.**
 
 A self-hostable backend for [SurveyJS](https://surveyjs.io/). Stores survey definitions as SurveyJS-native JSON, collects responses, and serves analytics — all as a plain REST API.
@@ -20,6 +27,92 @@ Deploy one instance. Integrate from any backend by making HTTP calls.
 - No authentication — bring your own. Pass the resolved user ID via `X-User-ID` and the engine stores it for attribution and access control.
 - No frontend — it is a pure REST API.
 - No notifications or invitations.
+
+---
+
+## Architecture
+
+### System overview
+
+```mermaid
+graph LR
+    subgraph "Your stack"
+        A[Your Backend / BFF]
+        B[SurveyJS Frontend]
+    end
+
+    subgraph "Survey Engine"
+        C[REST API :3000]
+        D[(PostgreSQL)]
+    end
+
+    E[Your Webhook Handler]
+
+    A -- "HTTP + X-User-ID" --> C
+    B -- "GET /surveys/:id/runtime\nPATCH /responses/:id" --> C
+    C -- "TypeORM" --> D
+    C -- "HMAC-signed POST" --> E
+```
+
+### Publish & versioning flow
+
+```mermaid
+sequenceDiagram
+    participant Owner as Survey Owner
+    participant API as Survey Engine
+    participant DB as PostgreSQL
+
+    Owner->>API: PATCH /surveys/:id (edit draft)
+    API->>DB: update draftSchemaJson
+
+    Owner->>API: POST /surveys/:id/publish
+    API->>API: validate schema
+    API->>DB: INSERT survey_version (immutable snapshot + SHA-256)
+    API->>DB: UPDATE survey.activeVersionId
+    API-->>Owner: { status: published, activeVersionId }
+
+    Note over DB: In-flight responses keep<br/>their pinned surveyVersionId
+```
+
+### Data model
+
+```mermaid
+erDiagram
+    Survey {
+        uuid id PK
+        string name
+        string status
+        jsonb draftSchemaJson
+        jsonb draftLogicJson
+        jsonb settings
+        uuid activeVersionId FK
+        string createdBy
+    }
+
+    SurveyVersion {
+        uuid id PK
+        uuid surveyId FK
+        int versionNumber
+        jsonb schemaJson
+        jsonb logicJson
+        string checksum
+    }
+
+    Response {
+        uuid id PK
+        uuid surveyId FK
+        uuid surveyVersionId FK
+        string respondentId
+        string status
+        jsonb answersJson
+        jsonb metadata
+        timestamp completedAt
+    }
+
+    Survey ||--o{ SurveyVersion : "has versions"
+    Survey ||--o{ Response : "collects"
+    SurveyVersion ||--o{ Response : "pins to version"
+```
 
 ---
 
