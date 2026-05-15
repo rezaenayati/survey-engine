@@ -19,7 +19,12 @@ import {
   ApiSecurity,
 } from '@nestjs/swagger';
 import { ResponsesService } from './responses.service';
-import { StartResponseDto, UpdateResponseDto, ListResponsesQueryDto, ResponseValidationResultDto } from './dto';
+import {
+  StartResponseDto,
+  UpdateResponseDto,
+  ListResponsesQueryDto,
+  ResponseValidationResultDto,
+} from './dto';
 import { LogicEvaluationResultDto } from '../surveys/dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
@@ -107,7 +112,11 @@ export class ResponsesController {
   @Get(':id/validate')
   @ApiOperation({ summary: 'Validate a response without completing it' })
   @ApiParam({ name: 'id', description: 'Response ID' })
-  @ApiResponse({ status: 200, description: 'Validation result', type: ResponseValidationResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation result',
+    type: ResponseValidationResultDto,
+  })
   @ApiResponse({ status: 404, description: 'Response not found' })
   async validate(
     @GetContext() ctx: RequestContext,
@@ -119,7 +128,11 @@ export class ResponsesController {
   @Get(':id/logic')
   @ApiOperation({ summary: 'Evaluate logic rules for current response state' })
   @ApiParam({ name: 'id', description: 'Response ID' })
-  @ApiResponse({ status: 200, description: 'Logic evaluation result', type: LogicEvaluationResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Logic evaluation result',
+    type: LogicEvaluationResultDto,
+  })
   @ApiResponse({ status: 404, description: 'Response not found' })
   async evaluateLogic(
     @GetContext() ctx: RequestContext,

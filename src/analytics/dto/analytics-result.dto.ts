@@ -25,7 +25,10 @@ export class AnalyticsSummaryDto {
   @ApiProperty({ description: 'Number of responses this week' })
   responsesThisWeek: number;
 
-  @ApiPropertyOptional({ description: 'Version numbers included in this analysis', type: [Number] })
+  @ApiPropertyOptional({
+    description: 'Version numbers included in this analysis',
+    type: [Number],
+  })
   versionsIncluded?: number[];
 }
 
@@ -45,16 +48,22 @@ export class AnalyticsFunnelDto {
   @ApiProperty({ description: 'Explicitly abandoned responses' })
   abandoned: number;
 
-  @ApiProperty({ description: 'Active responses not yet finished (started + inProgress)' })
+  @ApiProperty({
+    description: 'Active responses not yet finished (started + inProgress)',
+  })
   activeResponses: number;
 
-  @ApiProperty({ description: 'Stale responses (in_progress with no activity for X days)' })
+  @ApiProperty({
+    description: 'Stale responses (in_progress with no activity for X days)',
+  })
   staleResponses: number;
 
   @ApiProperty({ description: 'Completion rate (completed / total × 100)' })
   completionRate: number;
 
-  @ApiProperty({ description: 'Drop-off rate ((total - completed) / total × 100)' })
+  @ApiProperty({
+    description: 'Drop-off rate ((total - completed) / total × 100)',
+  })
   dropOffRate: number;
 
   @ApiProperty({ description: 'Abandonment rate (abandoned / total × 100)' })
@@ -73,9 +82,15 @@ export class TrendDataPointDto {
 }
 
 export class AnalyticsTrendsDto {
-  @ApiProperty({ description: 'Daily response counts', type: [TrendDataPointDto] })
+  @ApiProperty({
+    description: 'Daily response counts',
+    type: [TrendDataPointDto],
+  })
   daily: TrendDataPointDto[];
 
-  @ApiProperty({ description: 'Weekly response counts', type: [TrendDataPointDto] })
+  @ApiProperty({
+    description: 'Weekly response counts',
+    type: [TrendDataPointDto],
+  })
   weekly: TrendDataPointDto[];
 }

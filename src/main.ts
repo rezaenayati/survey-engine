@@ -18,11 +18,18 @@ async function bootstrap() {
   // CORS — allow specific origins from env, or all in development
   const corsOrigins = process.env.CORS_ORIGINS;
   app.enableCors({
-    origin: corsOrigins && corsOrigins !== '*'
-      ? corsOrigins.split(',').map((o) => o.trim())
-      : true,
+    origin:
+      corsOrigins && corsOrigins !== '*'
+        ? corsOrigins.split(',').map((o) => o.trim())
+        : true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-ID', 'X-Correlation-ID', 'X-API-Key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-User-ID',
+      'X-Correlation-ID',
+      'X-API-Key',
+    ],
   });
 
   // Global validation
@@ -43,7 +50,7 @@ async function bootstrap() {
     .setTitle('Survey Engine API')
     .setDescription(
       'Standalone SurveyJS-compatible survey backend. ' +
-      'Pass an optional X-User-ID header to attribute operations to a user.',
+        'Pass an optional X-User-ID header to attribute operations to a user.',
     )
     .setVersion('1.0')
     .addTag('surveys', 'Survey management endpoints')

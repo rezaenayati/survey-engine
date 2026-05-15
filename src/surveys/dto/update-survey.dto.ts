@@ -34,7 +34,10 @@ export class UpdateSurveyDto {
   @IsObject()
   logicJson?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Survey settings', type: SurveySettingsDto })
+  @ApiPropertyOptional({
+    description: 'Survey settings',
+    type: SurveySettingsDto,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => SurveySettingsDto)

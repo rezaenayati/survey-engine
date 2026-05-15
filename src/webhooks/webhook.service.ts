@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
-import type { SurveySettings, WebhookEvent } from '../surveys/entities/survey.entity';
+import type {
+  SurveySettings,
+  WebhookEvent,
+} from '../surveys/entities/survey.entity';
 
 export interface WebhookPayload {
   /** Event type */
@@ -15,7 +18,10 @@ export interface WebhookPayload {
   answersJson: Record<string, unknown>;
 }
 
-const DEFAULT_EVENTS: WebhookEvent[] = ['response.started', 'response.completed'];
+const DEFAULT_EVENTS: WebhookEvent[] = [
+  'response.started',
+  'response.completed',
+];
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -61,7 +67,8 @@ export class WebhookService {
     };
 
     if (secret) {
-      headers['X-Survey-Engine-Signature'] = `sha256=${this.sign(body, secret)}`;
+      headers['X-Survey-Engine-Signature'] =
+        `sha256=${this.sign(body, secret)}`;
     }
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -70,7 +77,12 @@ export class WebhookService {
         const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         let res: globalThis.Response;
         try {
-          res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
+          res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body,
+            signal: controller.signal,
+          });
         } finally {
           clearTimeout(timer);
         }

@@ -21,7 +21,10 @@ export class HealthController {
 
   @Get('ready')
   @ApiOperation({ summary: 'Readiness check — DB is reachable' })
-  @ApiResponse({ status: 200, description: 'Service is ready to accept traffic' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service is ready to accept traffic',
+  })
   @ApiResponse({ status: 503, description: 'Database not reachable' })
   async ready() {
     try {

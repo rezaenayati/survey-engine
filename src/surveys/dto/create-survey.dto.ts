@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsObject, MaxLength, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsObject,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SurveySettingsDto } from './survey-settings.dto';
@@ -28,7 +34,10 @@ export class CreateSurveyDto {
   @IsObject()
   logicJson?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Survey settings', type: SurveySettingsDto })
+  @ApiPropertyOptional({
+    description: 'Survey settings',
+    type: SurveySettingsDto,
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => SurveySettingsDto)

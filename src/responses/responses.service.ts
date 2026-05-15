@@ -13,7 +13,11 @@ import { ResponseStatus } from '../common/constants/status.constants';
 import { RequestContext } from '../common/interfaces/request-context.interface';
 import { WebhookService } from '../webhooks/webhook.service';
 import { PaginatedResponseDto } from '../common/dto/pagination.dto';
-import { StartResponseDto, UpdateResponseDto, ListResponsesQueryDto } from './dto';
+import {
+  StartResponseDto,
+  UpdateResponseDto,
+  ListResponsesQueryDto,
+} from './dto';
 import {
   ResponseValidatorService,
   LogicEngineService,
@@ -93,7 +97,9 @@ export class ResponsesService {
       // can see all its responses (survey-owner view).
       const survey = await this.surveysService.findOne(ctx, surveyId);
       if (survey.createdBy && ctx.userId && survey.createdBy !== ctx.userId) {
-        throw new ForbiddenException('You do not have access to this survey\'s responses');
+        throw new ForbiddenException(
+          "You do not have access to this survey's responses",
+        );
       }
       where.surveyId = surveyId;
     } else {
@@ -131,11 +137,15 @@ export class ResponsesService {
     }
 
     // Allow: respondent themselves, survey owner, or no-auth deployment
-    const isRespondent = !response.respondentId || !ctx.userId || response.respondentId === ctx.userId;
+    const isRespondent =
+      !response.respondentId ||
+      !ctx.userId ||
+      response.respondentId === ctx.userId;
     if (!isRespondent) {
       // Check if caller owns the survey this response belongs to
       const survey = await this.surveysService.findOne(ctx, response.surveyId);
-      const isSurveyOwner = !survey.createdBy || !ctx.userId || survey.createdBy === ctx.userId;
+      const isSurveyOwner =
+        !survey.createdBy || !ctx.userId || survey.createdBy === ctx.userId;
       if (!isSurveyOwner) {
         throw new ForbiddenException('You do not have access to this response');
       }
@@ -146,8 +156,14 @@ export class ResponsesService {
 
   /** Ensure caller is the original respondent before mutating a response */
   private assertRespondent(response: Response, ctx: RequestContext): void {
-    if (response.respondentId && ctx.userId && response.respondentId !== ctx.userId) {
-      throw new ForbiddenException('Only the original respondent can modify this response');
+    if (
+      response.respondentId &&
+      ctx.userId &&
+      response.respondentId !== ctx.userId
+    ) {
+      throw new ForbiddenException(
+        'Only the original respondent can modify this response',
+      );
     }
   }
 
@@ -195,7 +211,7 @@ export class ResponsesService {
     );
 
     const validation = this.responseValidator.validateResponse(
-      version.schemaJson as unknown as SurveySchema,
+      version.schemaJson,
       response.answersJson,
       { validateRequired: true, partialValidation: false },
     );
@@ -214,9 +230,10 @@ export class ResponsesService {
       throw new BadRequestException({
         message: 'Response validation failed',
         errors: visibleQuestionErrors,
-        missingRequired: [...validation.missingRequired, ...missingLogicRequired].filter(
-          (qId) => logicResult.visibleQuestions.includes(qId),
-        ),
+        missingRequired: [
+          ...validation.missingRequired,
+          ...missingLogicRequired,
+        ].filter((qId) => logicResult.visibleQuestions.includes(qId)),
       });
     }
 
@@ -273,7 +290,7 @@ export class ResponsesService {
     );
 
     const validation = this.responseValidator.validateResponse(
-      version.schemaJson as unknown as SurveySchema,
+      version.schemaJson,
       response.answersJson,
       { validateRequired: true, partialValidation: true },
     );
@@ -284,7 +301,10 @@ export class ResponsesService {
     });
 
     const allRequired = [
-      ...new Set([...validation.missingRequired, ...logicResult.requiredQuestions]),
+      ...new Set([
+        ...validation.missingRequired,
+        ...logicResult.requiredQuestions,
+      ]),
     ].filter((qId) => logicResult.visibleQuestions.includes(qId));
 
     const missingRequired = allRequired.filter((qId) => {

@@ -41,7 +41,10 @@ export class AnswerFilterDto {
   @IsEnum(FilterOperator)
   operator: FilterOperator;
 
-  @ApiProperty({ description: 'Value to compare against (string, number, or array for "in" operator)' })
+  @ApiProperty({
+    description:
+      'Value to compare against (string, number, or array for "in" operator)',
+  })
   value: string | number | string[];
 }
 
@@ -60,18 +63,25 @@ export class AnalyticsQueryDto {
   @IsDateString()
   endDate?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by specific survey version (required if versionMode is "specific")' })
+  @ApiPropertyOptional({
+    description:
+      'Filter by specific survey version (required if versionMode is "specific")',
+  })
   @IsOptional()
   @IsUUID()
   versionId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by response status', enum: ResponseStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by response status',
+    enum: ResponseStatus,
+  })
   @IsOptional()
   @IsEnum(ResponseStatus)
   status?: ResponseStatus;
 
   @ApiPropertyOptional({
-    description: 'Version handling mode: "combined" merges all versions, "specific" uses one version',
+    description:
+      'Version handling mode: "combined" merges all versions, "specific" uses one version',
     enum: VersionMode,
     default: VersionMode.COMBINED,
   })
@@ -80,13 +90,16 @@ export class AnalyticsQueryDto {
   versionMode?: VersionMode = VersionMode.COMBINED;
 
   @ApiPropertyOptional({
-    description: 'Filter by specific respondent IDs (for external segmentation)',
+    description:
+      'Filter by specific respondent IDs (for external segmentation)',
     type: [String],
   })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @Transform(({ value }) => (typeof value === 'string' ? value.split(',') : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.split(',') : (value as string[]),
+  )
   respondentIds?: string[];
 
   @ApiPropertyOptional({
@@ -100,11 +113,12 @@ export class AnalyticsQueryDto {
   answerFilters?: AnswerFilterDto[];
 
   @ApiPropertyOptional({
-    description: 'Days of inactivity to consider a response "stale" (default: 7)',
+    description:
+      'Days of inactivity to consider a response "stale" (default: 7)',
     default: 7,
   })
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }: { value: unknown }) => parseInt(value as string, 10))
   staleDays?: number = 7;
 }

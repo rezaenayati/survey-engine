@@ -3,7 +3,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { ResponseStatus } from '../../common/constants/status.constants';
 
-export const RESPONSE_SORTABLE_FIELDS = ['startedAt', 'updatedAt', 'completedAt'] as const;
+export const RESPONSE_SORTABLE_FIELDS = [
+  'startedAt',
+  'updatedAt',
+  'completedAt',
+] as const;
 export type ResponseSortField = (typeof RESPONSE_SORTABLE_FIELDS)[number];
 
 export class ListResponsesQueryDto extends PaginationQueryDto {
@@ -21,7 +25,10 @@ export class ListResponsesQueryDto extends PaginationQueryDto {
   @IsUUID()
   surveyId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by status', enum: ResponseStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by status',
+    enum: ResponseStatus,
+  })
   @IsOptional()
   @IsEnum(ResponseStatus)
   status?: ResponseStatus;

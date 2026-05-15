@@ -11,7 +11,9 @@ export class StartResponseDto {
   @IsObject()
   answersJson?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Response metadata (browser, device, etc.)' })
+  @ApiPropertyOptional({
+    description: 'Response metadata (browser, device, etc.)',
+  })
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;

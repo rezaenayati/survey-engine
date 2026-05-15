@@ -30,7 +30,8 @@ export class LogicEngineService {
     answers: Record<string, unknown>,
   ): LogicEvaluationResult {
     // Initialize with all questions/pages visible
-    const allQuestionIds = this.schemaValidator.extractQuestionIds(surveySchema);
+    const allQuestionIds =
+      this.schemaValidator.extractQuestionIds(surveySchema);
     const allPageIds = this.schemaValidator.extractPageIds(surveySchema);
 
     const result: LogicEvaluationResult = {
@@ -60,7 +61,11 @@ export class LogicEngineService {
         continue;
       }
 
-      const ruleResult = this.evaluateRule(rule, answers, logicSchema.globalSettings?.strictMode);
+      const ruleResult = this.evaluateRule(
+        rule,
+        answers,
+        logicSchema.globalSettings?.strictMode,
+      );
       result.ruleResults.push(ruleResult);
 
       if (ruleResult.conditionMet && ruleResult.action) {
@@ -88,7 +93,11 @@ export class LogicEngineService {
     strictMode?: boolean,
   ): RuleEvaluationResult {
     try {
-      const conditionMet = this.evaluateCondition(rule.condition, answers, strictMode);
+      const conditionMet = this.evaluateCondition(
+        rule.condition,
+        answers,
+        strictMode,
+      );
 
       return {
         ruleId: rule.id,
@@ -154,7 +163,9 @@ export class LogicEngineService {
 
     // Handle strict mode for undefined questions
     if (answer === undefined && strictMode) {
-      throw new Error(`Question "${condition.questionId}" not found in answers`);
+      throw new Error(
+        `Question "${condition.questionId}" not found in answers`,
+      );
     }
 
     return this.compareValues(answer, condition.operator, condition.value);
@@ -206,10 +217,10 @@ export class LogicEngineService {
         return !this.contains(answerValue, compareValue);
 
       case ComparisonOperator.STARTS_WITH:
-        return String(answerValue).startsWith(String(compareValue));
+        return this.toStr(answerValue).startsWith(this.toStr(compareValue));
 
       case ComparisonOperator.ENDS_WITH:
-        return String(answerValue).endsWith(String(compareValue));
+        return this.toStr(answerValue).endsWith(this.toStr(compareValue));
 
       case ComparisonOperator.IN:
         return this.isIn(answerValue, compareValue);
@@ -219,8 +230,8 @@ export class LogicEngineService {
 
       case ComparisonOperator.MATCHES:
         try {
-          const regex = new RegExp(String(compareValue));
-          return regex.test(String(answerValue));
+          const regex = new RegExp(this.toStr(compareValue));
+          return regex.test(this.toStr(answerValue));
         } catch {
           return false;
         }
@@ -237,7 +248,8 @@ export class LogicEngineService {
     if (value === undefined || value === null) return true;
     if (value === '') return true;
     if (Array.isArray(value) && value.length === 0) return true;
-    if (typeof value === 'object' && Object.keys(value as object).length === 0) return true;
+    if (typeof value === 'object' && Object.keys(value).length === 0)
+      return true;
     return false;
   }
 
@@ -262,12 +274,20 @@ export class LogicEngineService {
     }
 
     // Handle object comparison
-    if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
-      const keysA = Object.keys(a as object);
-      const keysB = Object.keys(b as object);
+    if (
+      typeof a === 'object' &&
+      typeof b === 'object' &&
+      a !== null &&
+      b !== null
+    ) {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
       if (keysA.length !== keysB.length) return false;
       return keysA.every((key) =>
-        this.equals((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+        this.equals(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+        ),
       );
     }
 
@@ -304,9 +324,17 @@ export class LogicEngineService {
       return haystack.some((item) => this.equals(item, needle));
     }
     if (typeof haystack === 'string') {
-      return haystack.toLowerCase().includes(String(needle).toLowerCase());
+      return haystack.toLowerCase().includes(this.toStr(needle).toLowerCase());
     }
     return false;
+  }
+
+  private toStr(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean')
+      return String(value);
+    if (value === null || value === undefined) return '';
+    return JSON.stringify(value);
   }
 
   /**
@@ -321,7 +349,13 @@ export class LogicEngineService {
    * Apply a rule action to the evaluation result
    */
   private applyRuleAction(
-    action: { type: RuleType; targetId: string; targetType: 'question' | 'page'; value?: unknown; expression?: string },
+    action: {
+      type: RuleType;
+      targetId: string;
+      targetType: 'question' | 'page';
+      value?: unknown;
+      expression?: string;
+    },
     result: LogicEvaluationResult,
   ): void {
     switch (action.type) {
@@ -409,12 +443,21 @@ export class LogicEngineService {
     }
 
     // Get all valid question and page IDs
-    const validQuestionIds = new Set(this.schemaValidator.extractQuestionIds(surveySchema));
-    const validPageIds = new Set(this.schemaValidator.extractPageIds(surveySchema));
+    const validQuestionIds = new Set(
+      this.schemaValidator.extractQuestionIds(surveySchema),
+    );
+    const validPageIds = new Set(
+      this.schemaValidator.extractPageIds(surveySchema),
+    );
 
     // Validate each rule
     schema.rules.forEach((rule, index) => {
-      const ruleErrors = this.validateRule(rule, index, validQuestionIds, validPageIds);
+      const ruleErrors = this.validateRule(
+        rule,
+        index,
+        validQuestionIds,
+        validPageIds,
+      );
       errors.push(...ruleErrors);
     });
 
@@ -459,7 +502,9 @@ export class LogicEngineService {
       if (!targetId) {
         errors.push(`${prefix}.action: Target ID is required`);
       } else if (targetType === 'question' && !validQuestionIds.has(targetId)) {
-        errors.push(`${prefix}.action: Invalid question target ID: ${targetId}`);
+        errors.push(
+          `${prefix}.action: Invalid question target ID: ${targetId}`,
+        );
       } else if (targetType === 'page' && !validPageIds.has(targetId)) {
         errors.push(`${prefix}.action: Invalid page target ID: ${targetId}`);
       }
@@ -481,7 +526,11 @@ export class LogicEngineService {
     if (isConditionGroup(condition)) {
       condition.conditions.forEach((c, i) => {
         errors.push(
-          ...this.validateConditionReferences(c, `${path}.conditions[${i}]`, validQuestionIds),
+          ...this.validateConditionReferences(
+            c,
+            `${path}.conditions[${i}]`,
+            validQuestionIds,
+          ),
         );
       });
     } else {
@@ -532,7 +581,9 @@ export class LogicEngineService {
     }
 
     // Only return required questions that are also visible
-    const allRequired = [...new Set([...schemaRequired, ...result.requiredQuestions])];
+    const allRequired = [
+      ...new Set([...schemaRequired, ...result.requiredQuestions]),
+    ];
     return allRequired.filter((id) => result.visibleQuestions.includes(id));
   }
 }

@@ -10,11 +10,13 @@ import { QuestionAnalyticsService } from './question-analytics.service';
 import { ExportService } from './export.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([SurveyVersion, Response]),
-    SurveysModule,
-  ],
+  imports: [TypeOrmModule.forFeature([SurveyVersion, Response]), SurveysModule],
   controllers: [AnalyticsController],
-  providers: [AnalyticsService, AggregationService, QuestionAnalyticsService, ExportService],
+  providers: [
+    AnalyticsService,
+    AggregationService,
+    QuestionAnalyticsService,
+    ExportService,
+  ],
 })
 export class AnalyticsModule {}

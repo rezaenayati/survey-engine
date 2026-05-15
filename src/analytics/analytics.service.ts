@@ -34,18 +34,38 @@ export class AnalyticsService {
     this.surveysService.assertOwner(survey, ctx);
 
     if (query.versionMode === VersionMode.SPECIFIC && !query.versionId) {
-      throw new BadRequestException('versionId is required when versionMode is "specific"');
+      throw new BadRequestException(
+        'versionId is required when versionMode is "specific"',
+      );
     }
 
-    const versions = await this.questionAnalyticsService.getRelevantVersions(surveyId, query);
-    const versionNumbers = versions.map(v => v.versionNumber);
-    const baseQuery = this.aggregationService.buildBaseQuery(ctx, surveyId, query);
+    const versions = await this.questionAnalyticsService.getRelevantVersions(
+      surveyId,
+      query,
+    );
+    const versionNumbers = versions.map((v) => v.versionNumber);
+    const baseQuery = this.aggregationService.buildBaseQuery(
+      ctx,
+      surveyId,
+      query,
+    );
 
     const [summary, funnel, trends, questions] = await Promise.all([
-      this.aggregationService.calculateSummaryDB(baseQuery.clone(), versionNumbers),
-      this.aggregationService.calculateFunnelDB(baseQuery.clone(), query.staleDays || 7),
+      this.aggregationService.calculateSummaryDB(
+        baseQuery.clone(),
+        versionNumbers,
+      ),
+      this.aggregationService.calculateFunnelDB(
+        baseQuery.clone(),
+        query.staleDays || 7,
+      ),
       this.aggregationService.calculateTrendsDB(baseQuery.clone()),
-      this.questionAnalyticsService.calculateQuestionAnalyticsDB(ctx, surveyId, query, versions),
+      this.questionAnalyticsService.calculateQuestionAnalyticsDB(
+        ctx,
+        surveyId,
+        query,
+        versions,
+      ),
     ]);
 
     return {
@@ -66,9 +86,19 @@ export class AnalyticsService {
     query: AnalyticsQueryDto,
   ): Promise<AnalyticsSummaryDto> {
     await this.verifySurveyExists(ctx, surveyId);
-    const versions = await this.questionAnalyticsService.getRelevantVersions(surveyId, query);
-    const baseQuery = this.aggregationService.buildBaseQuery(ctx, surveyId, query);
-    return this.aggregationService.calculateSummaryDB(baseQuery, versions.map(v => v.versionNumber));
+    const versions = await this.questionAnalyticsService.getRelevantVersions(
+      surveyId,
+      query,
+    );
+    const baseQuery = this.aggregationService.buildBaseQuery(
+      ctx,
+      surveyId,
+      query,
+    );
+    return this.aggregationService.calculateSummaryDB(
+      baseQuery,
+      versions.map((v) => v.versionNumber),
+    );
   }
 
   async getFunnel(
@@ -77,8 +107,15 @@ export class AnalyticsService {
     query: AnalyticsQueryDto,
   ): Promise<AnalyticsFunnelDto> {
     await this.verifySurveyExists(ctx, surveyId);
-    const baseQuery = this.aggregationService.buildBaseQuery(ctx, surveyId, query);
-    return this.aggregationService.calculateFunnelDB(baseQuery, query.staleDays || 7);
+    const baseQuery = this.aggregationService.buildBaseQuery(
+      ctx,
+      surveyId,
+      query,
+    );
+    return this.aggregationService.calculateFunnelDB(
+      baseQuery,
+      query.staleDays || 7,
+    );
   }
 
   async getTrends(
@@ -87,7 +124,11 @@ export class AnalyticsService {
     query: AnalyticsQueryDto,
   ): Promise<AnalyticsTrendsDto> {
     await this.verifySurveyExists(ctx, surveyId);
-    const baseQuery = this.aggregationService.buildBaseQuery(ctx, surveyId, query);
+    const baseQuery = this.aggregationService.buildBaseQuery(
+      ctx,
+      surveyId,
+      query,
+    );
     return this.aggregationService.calculateTrendsDB(baseQuery);
   }
 
@@ -97,8 +138,16 @@ export class AnalyticsService {
     query: AnalyticsQueryDto,
   ): Promise<QuestionAnalyticsDto[]> {
     await this.verifySurveyExists(ctx, surveyId);
-    const versions = await this.questionAnalyticsService.getRelevantVersions(surveyId, query);
-    return this.questionAnalyticsService.calculateQuestionAnalyticsDB(ctx, surveyId, query, versions);
+    const versions = await this.questionAnalyticsService.getRelevantVersions(
+      surveyId,
+      query,
+    );
+    return this.questionAnalyticsService.calculateQuestionAnalyticsDB(
+      ctx,
+      surveyId,
+      query,
+      versions,
+    );
   }
 
   async exportAnalytics(
@@ -131,10 +180,18 @@ export class AnalyticsService {
     query: TextResponsesQueryDto,
   ): Promise<PaginatedTextResponsesDto> {
     await this.verifySurveyExists(ctx, surveyId);
-    return this.questionAnalyticsService.getTextResponses(ctx, surveyId, questionId, query);
+    return this.questionAnalyticsService.getTextResponses(
+      ctx,
+      surveyId,
+      questionId,
+      query,
+    );
   }
 
-  private async verifySurveyExists(ctx: RequestContext, surveyId: string): Promise<void> {
+  private async verifySurveyExists(
+    ctx: RequestContext,
+    surveyId: string,
+  ): Promise<void> {
     await this.surveysService.findOne(ctx, surveyId);
   }
 }

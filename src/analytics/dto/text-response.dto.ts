@@ -7,13 +7,13 @@ export class TextResponsesQueryDto extends AnalyticsQueryDto {
   @ApiPropertyOptional({ description: 'Page number (1-based)', default: 1 })
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }: { value: unknown }) => parseInt(value as string, 10))
   page?: number = 1;
 
   @ApiPropertyOptional({ description: 'Items per page (max 100)', default: 20 })
   @IsOptional()
   @IsNumber()
-  @Transform(({ value }) => parseInt(value, 10))
+  @Transform(({ value }: { value: unknown }) => parseInt(value as string, 10))
   limit?: number = 20;
 
   @ApiPropertyOptional({ description: 'Search/filter text responses' })

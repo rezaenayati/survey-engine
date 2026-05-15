@@ -40,7 +40,11 @@ export class AnalyticsController {
   @Get(':id/analytics')
   @ApiOperation({ summary: 'Get complete analytics for a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Complete survey analytics', type: SurveyAnalyticsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Complete survey analytics',
+    type: SurveyAnalyticsDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getAnalytics(
     @GetContext() ctx: RequestContext,
@@ -53,7 +57,11 @@ export class AnalyticsController {
   @Get(':id/analytics/summary')
   @ApiOperation({ summary: 'Get summary statistics for a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Summary statistics', type: AnalyticsSummaryDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Summary statistics',
+    type: AnalyticsSummaryDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getAnalyticsSummary(
     @GetContext() ctx: RequestContext,
@@ -66,7 +74,11 @@ export class AnalyticsController {
   @Get(':id/analytics/funnel')
   @ApiOperation({ summary: 'Get completion funnel data for a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Funnel data', type: AnalyticsFunnelDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Funnel data',
+    type: AnalyticsFunnelDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getAnalyticsFunnel(
     @GetContext() ctx: RequestContext,
@@ -79,7 +91,11 @@ export class AnalyticsController {
   @Get(':id/analytics/trends')
   @ApiOperation({ summary: 'Get response trends over time for a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Trends data', type: AnalyticsTrendsDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Trends data',
+    type: AnalyticsTrendsDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getAnalyticsTrends(
     @GetContext() ctx: RequestContext,
@@ -92,7 +108,11 @@ export class AnalyticsController {
   @Get(':id/analytics/questions')
   @ApiOperation({ summary: 'Get per-question analytics for a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Question analytics', type: [QuestionAnalyticsDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Question analytics',
+    type: [QuestionAnalyticsDto],
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getAnalyticsQuestions(
     @GetContext() ctx: RequestContext,
@@ -103,13 +123,31 @@ export class AnalyticsController {
   }
 
   @Get(':id/analytics/questions/:questionId/responses')
-  @ApiOperation({ summary: 'Get paginated text responses for a specific question' })
+  @ApiOperation({
+    summary: 'Get paginated text responses for a specific question',
+  })
   @ApiParam({ name: 'id', description: 'Survey ID' })
   @ApiParam({ name: 'questionId', description: 'Question ID' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number (1-based)' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (max 100)' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search text in responses' })
-  @ApiResponse({ status: 200, description: 'Paginated text responses', type: PaginatedTextResponsesDto })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (1-based)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page (max 100)',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search text in responses',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated text responses',
+    type: PaginatedTextResponsesDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getQuestionTextResponses(
     @GetContext() ctx: RequestContext,
@@ -133,10 +171,16 @@ export class AnalyticsController {
     @Res() res: ExpressResponse,
   ): Promise<void> {
     const result = await this.analyticsService.exportAnalytics(
-      ctx, id, query, query.format || ExportFormat.JSON,
+      ctx,
+      id,
+      query,
+      query.format || ExportFormat.JSON,
     );
     res.setHeader('Content-Type', result.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
     res.send(result.data);
   }
 }

@@ -30,8 +30,12 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_surveys_status"    ON "surveys" ("status")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_surveys_createdAt" ON "surveys" ("createdAt")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_surveys_status"    ON "surveys" ("status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_surveys_createdAt" ON "surveys" ("createdAt")`,
+    );
 
     // survey_versions table
     await queryRunner.query(`
@@ -49,8 +53,12 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId"              ON "survey_versions" ("surveyId")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId_versionNumber" ON "survey_versions" ("surveyId", "versionNumber")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId"              ON "survey_versions" ("surveyId")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_survey_versions_surveyId_versionNumber" ON "survey_versions" ("surveyId", "versionNumber")`,
+    );
 
     // FK: surveys.activeVersionId → survey_versions.id (SET NULL on delete)
     await queryRunner.query(`
@@ -97,8 +105,12 @@ export class InitialSchema1747350000000 implements MigrationInterface {
       )
     `);
 
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_responses_surveyId_status" ON "responses" ("surveyId", "status")`);
-    await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_responses_surveyVersionId"  ON "responses" ("surveyVersionId")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_responses_surveyId_status" ON "responses" ("surveyId", "status")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_responses_surveyVersionId"  ON "responses" ("surveyVersionId")`,
+    );
 
     await queryRunner.query(`
       DO $$ BEGIN
@@ -120,13 +132,21 @@ export class InitialSchema1747350000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "responses" DROP CONSTRAINT "FK_responses_surveyVersionId"`);
-    await queryRunner.query(`ALTER TABLE "responses" DROP CONSTRAINT "FK_responses_surveyId"`);
+    await queryRunner.query(
+      `ALTER TABLE "responses" DROP CONSTRAINT "FK_responses_surveyVersionId"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "responses" DROP CONSTRAINT "FK_responses_surveyId"`,
+    );
     await queryRunner.query(`DROP TABLE "responses"`);
     await queryRunner.query(`DROP TYPE "public"."responses_status_enum"`);
 
-    await queryRunner.query(`ALTER TABLE "survey_versions" DROP CONSTRAINT "FK_survey_versions_surveyId"`);
-    await queryRunner.query(`ALTER TABLE "surveys" DROP CONSTRAINT "FK_surveys_activeVersionId"`);
+    await queryRunner.query(
+      `ALTER TABLE "survey_versions" DROP CONSTRAINT "FK_survey_versions_surveyId"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "surveys" DROP CONSTRAINT "FK_surveys_activeVersionId"`,
+    );
     await queryRunner.query(`DROP TABLE "survey_versions"`);
     await queryRunner.query(`DROP TABLE "surveys"`);
     await queryRunner.query(`DROP TYPE "public"."surveys_status_enum"`);

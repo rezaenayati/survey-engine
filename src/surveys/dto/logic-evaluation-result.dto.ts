@@ -19,6 +19,9 @@ export class LogicEvaluationResultDto {
   @ApiProperty({ type: 'object', additionalProperties: true })
   calculatedValues: Record<string, unknown>;
 
-  @ApiPropertyOptional({ type: 'object', additionalProperties: { type: 'string' } })
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+  })
   validationErrors?: Record<string, string>;
 }

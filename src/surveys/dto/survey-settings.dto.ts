@@ -12,15 +12,22 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import type { WebhookEvent } from '../entities/survey.entity';
 
-const WEBHOOK_EVENTS: WebhookEvent[] = ['response.started', 'response.completed'];
+const WEBHOOK_EVENTS: WebhookEvent[] = [
+  'response.started',
+  'response.completed',
+];
 
 export class SurveySettingsDto {
-  @ApiPropertyOptional({ description: 'Allow anonymous (unauthenticated) responses' })
+  @ApiPropertyOptional({
+    description: 'Allow anonymous (unauthenticated) responses',
+  })
   @IsOptional()
   @IsBoolean()
   allowAnonymous?: boolean;
 
-  @ApiPropertyOptional({ description: 'Require the caller to supply X-User-ID' })
+  @ApiPropertyOptional({
+    description: 'Require the caller to supply X-User-ID',
+  })
   @IsOptional()
   @IsBoolean()
   requireAuth?: boolean;
@@ -30,12 +37,17 @@ export class SurveySettingsDto {
   @IsBoolean()
   accessTokenRequired?: boolean;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 date from which the survey accepts responses' })
+  @ApiPropertyOptional({
+    description: 'ISO-8601 date from which the survey accepts responses',
+  })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: 'ISO-8601 date after which the survey stops accepting responses' })
+  @ApiPropertyOptional({
+    description:
+      'ISO-8601 date after which the survey stops accepting responses',
+  })
   @IsOptional()
   @IsDateString()
   endDate?: string;
@@ -54,7 +66,9 @@ export class SurveySettingsDto {
   @IsUrl({ require_tld: true, protocols: ['https', 'http'] })
   webhookUrl?: string;
 
-  @ApiPropertyOptional({ description: 'HMAC-SHA256 secret for signing webhook payloads' })
+  @ApiPropertyOptional({
+    description: 'HMAC-SHA256 secret for signing webhook payloads',
+  })
   @IsOptional()
   @IsString()
   webhookSecret?: string;

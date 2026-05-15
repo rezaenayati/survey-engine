@@ -41,7 +41,9 @@ export class SurveysService {
 
   async create(ctx: RequestContext, dto: CreateSurveyDto): Promise<Survey> {
     if (dto.schemaJson) {
-      const schemaValidation = this.schemaValidator.validateSchema(dto.schemaJson);
+      const schemaValidation = this.schemaValidator.validateSchema(
+        dto.schemaJson,
+      );
       if (!schemaValidation.valid) {
         throw new BadRequestException({
           message: 'Invalid survey schema',
@@ -123,7 +125,8 @@ export class SurveysService {
       relations: ['activeVersion'],
     });
 
-    if (!survey) throw new NotFoundException(`Survey with ID "${id}" not found`);
+    if (!survey)
+      throw new NotFoundException(`Survey with ID "${id}" not found`);
 
     return survey;
   }
@@ -141,7 +144,9 @@ export class SurveysService {
     }
 
     if (dto.schemaJson !== undefined) {
-      const schemaValidation = this.schemaValidator.validateSchema(dto.schemaJson);
+      const schemaValidation = this.schemaValidator.validateSchema(
+        dto.schemaJson,
+      );
       if (!schemaValidation.valid) {
         throw new BadRequestException({
           message: 'Invalid survey schema',
@@ -154,7 +159,8 @@ export class SurveysService {
     const effectiveLogic = dto.logicJson ?? survey.draftLogicJson;
 
     if (
-      effectiveLogic && effectiveSchema &&
+      effectiveLogic &&
+      effectiveSchema &&
       (dto.logicJson !== undefined || dto.schemaJson !== undefined)
     ) {
       const logicValidation = this.logicEngine.validateLogicSchema(
@@ -173,7 +179,8 @@ export class SurveysService {
     if (dto.description !== undefined) survey.description = dto.description;
     if (dto.schemaJson !== undefined) survey.draftSchemaJson = dto.schemaJson;
     if (dto.logicJson !== undefined) survey.draftLogicJson = dto.logicJson;
-    if (dto.settings !== undefined) survey.settings = { ...survey.settings, ...dto.settings };
+    if (dto.settings !== undefined)
+      survey.settings = { ...survey.settings, ...dto.settings };
     if (dto.status !== undefined) survey.status = dto.status;
 
     return this.surveyRepository.save(survey);

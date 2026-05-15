@@ -21,10 +21,15 @@ export class ChoiceDistributionDto {
   @ApiProperty({ description: 'Percentage of total' })
   percentage: number;
 
-  @ApiPropertyOptional({ description: 'True if this option was removed in newer versions' })
+  @ApiPropertyOptional({
+    description: 'True if this option was removed in newer versions',
+  })
   isLegacy?: boolean;
 
-  @ApiPropertyOptional({ description: 'Version numbers where this option exists', type: [Number] })
+  @ApiPropertyOptional({
+    description: 'Version numbers where this option exists',
+    type: [Number],
+  })
   fromVersions?: number[];
 }
 
@@ -44,7 +49,10 @@ export class QuestionAnalyticsDto {
   @ApiProperty({ description: 'Number of skipped/empty responses' })
   skipped: number;
 
-  @ApiPropertyOptional({ description: 'Distribution for choice questions', type: [ChoiceDistributionDto] })
+  @ApiPropertyOptional({
+    description: 'Distribution for choice questions',
+    type: [ChoiceDistributionDto],
+  })
   distribution?: ChoiceDistributionDto[];
 
   @ApiPropertyOptional({ description: 'Average value for numeric questions' })
@@ -53,7 +61,9 @@ export class QuestionAnalyticsDto {
   @ApiPropertyOptional({ description: 'Median value for numeric questions' })
   median?: number;
 
-  @ApiPropertyOptional({ description: 'Standard deviation for numeric questions' })
+  @ApiPropertyOptional({
+    description: 'Standard deviation for numeric questions',
+  })
   stdDeviation?: number;
 
   @ApiPropertyOptional({ description: 'Minimum value for numeric questions' })
@@ -62,19 +72,31 @@ export class QuestionAnalyticsDto {
   @ApiPropertyOptional({ description: 'Maximum value for numeric questions' })
   max?: number;
 
-  @ApiPropertyOptional({ description: 'Value distribution for rating/scale questions' })
+  @ApiPropertyOptional({
+    description: 'Value distribution for rating/scale questions',
+  })
   valueDistribution?: Record<string, number>;
 
-  @ApiPropertyOptional({ description: 'Word frequency for text questions (sampled)', type: [WordFrequencyDto] })
+  @ApiPropertyOptional({
+    description: 'Word frequency for text questions (sampled)',
+    type: [WordFrequencyDto],
+  })
   wordFrequency?: WordFrequencyDto[];
 
-  @ApiPropertyOptional({ description: 'Average text length for text questions' })
+  @ApiPropertyOptional({
+    description: 'Average text length for text questions',
+  })
   avgTextLength?: number;
 
-  @ApiPropertyOptional({ description: 'Number of responses analyzed for word frequency' })
+  @ApiPropertyOptional({
+    description: 'Number of responses analyzed for word frequency',
+  })
   sampleSize?: number;
 
-  @ApiPropertyOptional({ description: 'Recent text responses preview (last 10)', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Recent text responses preview (last 10)',
+    type: [String],
+  })
   recentResponses?: string[];
 
   @ApiPropertyOptional({ description: 'True count for boolean questions' })
@@ -83,9 +105,14 @@ export class QuestionAnalyticsDto {
   @ApiPropertyOptional({ description: 'False count for boolean questions' })
   falseCount?: number;
 
-  @ApiPropertyOptional({ description: 'True if this question was removed in newer versions' })
+  @ApiPropertyOptional({
+    description: 'True if this question was removed in newer versions',
+  })
   isLegacy?: boolean;
 
-  @ApiPropertyOptional({ description: 'Version numbers where this question exists', type: [Number] })
+  @ApiPropertyOptional({
+    description: 'Version numbers where this question exists',
+    type: [Number],
+  })
   fromVersions?: number[];
 }

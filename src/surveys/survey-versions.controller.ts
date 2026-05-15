@@ -31,9 +31,15 @@ export class SurveyVersionsController {
   constructor(private readonly surveyVersionsService: SurveyVersionsService) {}
 
   @Post(':id/publish')
-  @ApiOperation({ summary: 'Publish a survey (creates a new immutable version)' })
+  @ApiOperation({
+    summary: 'Publish a survey (creates a new immutable version)',
+  })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Survey published', type: SurveyDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Survey published',
+    type: SurveyDto,
+  })
   @ApiResponse({ status: 400, description: 'Cannot publish survey' })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async publish(
@@ -46,7 +52,11 @@ export class SurveyVersionsController {
   @Get(':id/versions')
   @ApiOperation({ summary: 'List all versions of a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'List of versions', type: [SurveyVersionDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'List of versions',
+    type: [SurveyVersionDto],
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getVersions(
     @GetContext() ctx: RequestContext,
@@ -59,7 +69,11 @@ export class SurveyVersionsController {
   @ApiOperation({ summary: 'Get a specific version of a survey' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
   @ApiParam({ name: 'versionId', description: 'Version ID' })
-  @ApiResponse({ status: 200, description: 'Version found', type: SurveyVersionDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Version found',
+    type: SurveyVersionDto,
+  })
   @ApiResponse({ status: 404, description: 'Version not found' })
   async getVersion(
     @GetContext() ctx: RequestContext,
@@ -70,9 +84,15 @@ export class SurveyVersionsController {
   }
 
   @Get(':id/runtime')
-  @ApiOperation({ summary: 'Get the active published version (for respondents)' })
+  @ApiOperation({
+    summary: 'Get the active published version (for respondents)',
+  })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Runtime version', type: SurveyVersionDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Runtime version',
+    type: SurveyVersionDto,
+  })
   @ApiResponse({ status: 400, description: 'No published version' })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async getRuntime(
@@ -83,9 +103,15 @@ export class SurveyVersionsController {
   }
 
   @Get(':id/validate')
-  @ApiOperation({ summary: 'Validate the draft schema and logic rules without publishing' })
+  @ApiOperation({
+    summary: 'Validate the draft schema and logic rules without publishing',
+  })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Validation result', type: SurveyValidationResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation result',
+    type: SurveyValidationResultDto,
+  })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async validateSurvey(
     @GetContext() ctx: RequestContext,
@@ -97,7 +123,11 @@ export class SurveyVersionsController {
   @Post(':id/evaluate-logic')
   @ApiOperation({ summary: 'Evaluate logic rules for the given answers' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Logic evaluation result', type: LogicEvaluationResultDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Logic evaluation result',
+    type: LogicEvaluationResultDto,
+  })
   @ApiResponse({ status: 400, description: 'No published version' })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async evaluateLogic(

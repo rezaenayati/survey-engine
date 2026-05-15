@@ -54,7 +54,9 @@ export class SurveyVersionsService {
       throw new BadRequestException('Cannot publish survey without a schema');
     }
 
-    const schemaValidation = this.schemaValidator.validateSchema(survey.draftSchemaJson);
+    const schemaValidation = this.schemaValidator.validateSchema(
+      survey.draftSchemaJson,
+    );
     if (!schemaValidation.valid) {
       throw new BadRequestException({
         message: 'Cannot publish: Invalid survey schema',
@@ -86,8 +88,16 @@ export class SurveyVersionsService {
     const version = this.versionRepository.create({
       surveyId: id,
       versionNumber: newVersionNumber,
-      schemaJson: JSON.parse(JSON.stringify(survey.draftSchemaJson)),
-      logicJson: survey.draftLogicJson ? JSON.parse(JSON.stringify(survey.draftLogicJson)) : null,
+      schemaJson: JSON.parse(JSON.stringify(survey.draftSchemaJson)) as Record<
+        string,
+        unknown
+      >,
+      logicJson: survey.draftLogicJson
+        ? (JSON.parse(JSON.stringify(survey.draftLogicJson)) as Record<
+            string,
+            unknown
+          >)
+        : null,
       publishedBy: ctx.userId || null,
       checksum,
     });
@@ -102,7 +112,10 @@ export class SurveyVersionsService {
     return this.surveysService.findOne(ctx, id);
   }
 
-  async getVersions(ctx: RequestContext, surveyId: string): Promise<SurveyVersion[]> {
+  async getVersions(
+    ctx: RequestContext,
+    surveyId: string,
+  ): Promise<SurveyVersion[]> {
     const survey = await this.surveysService.findOne(ctx, surveyId);
     this.assertOwner(survey, ctx);
 
@@ -124,16 +137,24 @@ export class SurveyVersionsService {
       where: { id: versionId, surveyId },
     });
 
-    if (!version) throw new NotFoundException(`Version "${versionId}" not found`);
+    if (!version)
+      throw new NotFoundException(`Version "${versionId}" not found`);
 
     return version;
   }
 
-  async getRuntime(_ctx: RequestContext, surveyId: string): Promise<SurveyVersion> {
-    const survey = await this.surveyRepository.findOne({ where: { id: surveyId } });
+  async getRuntime(
+    _ctx: RequestContext,
+    surveyId: string,
+  ): Promise<SurveyVersion> {
+    const survey = await this.surveyRepository.findOne({
+      where: { id: surveyId },
+    });
 
-    if (!survey) throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
-    if (!survey.activeVersionId) throw new BadRequestException('Survey has no published version');
+    if (!survey)
+      throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
+    if (!survey.activeVersionId)
+      throw new BadRequestException('Survey has no published version');
 
     const version = await this.versionRepository.findOne({
       where: { id: survey.activeVersionId },
@@ -164,7 +185,9 @@ export class SurveyVersionsService {
     let logicErrors: string[] = [];
 
     if (survey.draftSchemaJson) {
-      const schemaValidation = this.schemaValidator.validateSchema(survey.draftSchemaJson);
+      const schemaValidation = this.schemaValidator.validateSchema(
+        survey.draftSchemaJson,
+      );
       schemaValid = schemaValidation.valid;
       schemaErrors = schemaValidation.errors;
       schemaWarnings = schemaValidation.warnings;
@@ -179,7 +202,13 @@ export class SurveyVersionsService {
       }
     }
 
-    return { schemaValid, logicValid, schemaErrors, schemaWarnings, logicErrors };
+    return {
+      schemaValid,
+      logicValid,
+      schemaErrors,
+      schemaWarnings,
+      logicErrors,
+    };
   }
 
   async evaluateLogic(

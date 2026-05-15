@@ -4,7 +4,6 @@ import {
   SurveyPage,
   Question,
   QuestionType,
-  QuestionValidation,
 } from '../interfaces/survey-schema.interface';
 
 /**
@@ -166,7 +165,7 @@ export class SchemaValidatorService {
 
     // Get page ID (support both 'id' and 'name')
     const pageId = (surveyPage.id || surveyPage.name) as string | undefined;
-    
+
     if (!pageId) {
       errors.push({
         path: `${basePath}.id`,
@@ -190,7 +189,9 @@ export class SchemaValidatorService {
     }
 
     // Get questions (support both 'questions' and 'elements')
-    const questions = (surveyPage.questions || surveyPage.elements) as unknown[] | undefined;
+    const questions = (surveyPage.questions || surveyPage.elements) as
+      | unknown[]
+      | undefined;
 
     if (!questions) {
       errors.push({
@@ -359,13 +360,13 @@ export class SchemaValidatorService {
   extractQuestionIds(schema: SurveySchema | Record<string, unknown>): string[] {
     const ids: string[] = [];
     const pages = (schema as Record<string, unknown>).pages as unknown[];
-    
+
     if (pages && Array.isArray(pages)) {
       for (const page of pages) {
         const pageObj = page as Record<string, unknown>;
         // Support both 'questions' and 'elements'
         const questions = (pageObj.questions || pageObj.elements) as unknown[];
-        
+
         if (questions && Array.isArray(questions)) {
           for (const question of questions) {
             const q = question as Record<string, unknown>;
@@ -388,7 +389,7 @@ export class SchemaValidatorService {
   extractPageIds(schema: SurveySchema | Record<string, unknown>): string[] {
     const ids: string[] = [];
     const pages = (schema as Record<string, unknown>).pages as unknown[];
-    
+
     if (pages && Array.isArray(pages)) {
       for (const page of pages) {
         const pageObj = page as Record<string, unknown>;
@@ -411,13 +412,13 @@ export class SchemaValidatorService {
     questionId: string,
   ): Question | Record<string, unknown> | null {
     const pages = (schema as Record<string, unknown>).pages as unknown[];
-    
+
     if (!pages || !Array.isArray(pages)) return null;
-    
+
     for (const page of pages) {
       const pageObj = page as Record<string, unknown>;
       const questions = (pageObj.questions || pageObj.elements) as unknown[];
-      
+
       if (questions && Array.isArray(questions)) {
         const question = questions.find((q) => {
           const qObj = q as Record<string, unknown>;
@@ -438,14 +439,14 @@ export class SchemaValidatorService {
     pageId: string,
   ): SurveyPage | Record<string, unknown> | null {
     const pages = (schema as Record<string, unknown>).pages as unknown[];
-    
+
     if (!pages || !Array.isArray(pages)) return null;
-    
+
     const page = pages.find((p) => {
       const pObj = p as Record<string, unknown>;
       return pObj.id === pageId || pObj.name === pageId;
     });
-    
+
     return page as Record<string, unknown> | null;
   }
 }

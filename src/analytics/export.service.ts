@@ -14,11 +14,17 @@ export class ExportService {
     if (analytics.appliedFilters) {
       lines.push('APPLIED FILTERS');
       if (analytics.appliedFilters.dateRange) {
-        lines.push(`Date Range: ${analytics.appliedFilters.dateRange.startDate || 'any'} to ${analytics.appliedFilters.dateRange.endDate || 'any'}`);
+        lines.push(
+          `Date Range: ${analytics.appliedFilters.dateRange.startDate || 'any'} to ${analytics.appliedFilters.dateRange.endDate || 'any'}`,
+        );
       }
-      lines.push(`Version Mode: ${analytics.appliedFilters.versionMode || 'combined'}`);
+      lines.push(
+        `Version Mode: ${analytics.appliedFilters.versionMode || 'combined'}`,
+      );
       if (analytics.appliedFilters.respondentIdsCount) {
-        lines.push(`Respondent IDs: ${analytics.appliedFilters.respondentIdsCount} filtered`);
+        lines.push(
+          `Respondent IDs: ${analytics.appliedFilters.respondentIdsCount} filtered`,
+        );
       }
       lines.push('');
     }
@@ -52,10 +58,17 @@ export class ExportService {
       );
       if (q.distribution) {
         lines.push('Choice,Count,Percentage,Legacy');
-        for (const d of q.distribution) lines.push(`"${d.label}",${d.count},${d.percentage}%,${d.isLegacy ? 'Yes' : 'No'}`);
+        for (const d of q.distribution)
+          lines.push(
+            `"${d.label}",${d.count},${d.percentage}%,${d.isLegacy ? 'Yes' : 'No'}`,
+          );
       }
       if (q.average !== undefined) {
-        lines.push(`Average: ${q.average}`, `Median: ${q.median}`, `Std Deviation: ${q.stdDeviation}`);
+        lines.push(
+          `Average: ${q.average}`,
+          `Median: ${q.median}`,
+          `Std Deviation: ${q.stdDeviation}`,
+        );
       }
       if (q.wordFrequency?.length) {
         lines.push('Word,Count');

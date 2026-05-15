@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { SurveySchema } from '../interfaces/survey-schema.interface';
 import {
-  SurveySchema,
-  Question,
-  QuestionType,
-  QuestionValidation,
-} from '../interfaces/survey-schema.interface';
-import { SchemaValidatorService, ValidationError } from './schema-validator.service';
+  SchemaValidatorService,
+  ValidationError,
+} from './schema-validator.service';
 
 /**
  * Answer validation result for a single question
@@ -38,7 +36,13 @@ interface NormalizedQuestion {
   choices?: Array<{ value: string | number; text?: string }>;
   rateMin?: number;
   rateMax?: number;
-  validators?: Array<{ type: string; regex?: string; text?: string; minLength?: number; maxLength?: number }>;
+  validators?: Array<{
+    type: string;
+    regex?: string;
+    text?: string;
+    minLength?: number;
+    maxLength?: number;
+  }>;
   minLength?: number;
   maxLength?: number;
   min?: number;
@@ -75,7 +79,8 @@ export class ResponseValidatorService {
 
     for (const question of questions) {
       const answer = answers[question.id];
-      const hasAnswer = answer !== undefined && answer !== null && answer !== '';
+      const hasAnswer =
+        answer !== undefined && answer !== null && answer !== '';
 
       // Check required
       if (validateRequired && question.isRequired && !hasAnswer) {
@@ -122,7 +127,10 @@ export class ResponseValidatorService {
   /**
    * Validate a single answer against a question definition
    */
-  validateAnswer(question: NormalizedQuestion, answer: unknown): AnswerValidationResult {
+  validateAnswer(
+    question: NormalizedQuestion,
+    answer: unknown,
+  ): AnswerValidationResult {
     const errors: ValidationError[] = [];
     const basePath = question.id;
 
@@ -230,14 +238,20 @@ export class ResponseValidatorService {
     }
 
     // Check minLength/maxLength from question or validators
-    if (question.minLength !== undefined && answer.length < question.minLength) {
+    if (
+      question.minLength !== undefined &&
+      answer.length < question.minLength
+    ) {
       errors.push({
         path: basePath,
         message: `Answer must be at least ${question.minLength} characters`,
         code: 'MIN_LENGTH',
       });
     }
-    if (question.maxLength !== undefined && answer.length > question.maxLength) {
+    if (
+      question.maxLength !== undefined &&
+      answer.length > question.maxLength
+    ) {
       errors.push({
         path: basePath,
         message: `Answer must be at most ${question.maxLength} characters`,
@@ -266,8 +280,8 @@ export class ResponseValidatorService {
 
     // Validate against choices if available
     if (question.choices && question.choices.length > 0) {
-      const validValues = question.choices.map((c) => 
-        typeof c === 'object' ? c.value : c
+      const validValues = question.choices.map((c) =>
+        typeof c === 'object' ? c.value : c,
       );
       if (!validValues.includes(answer)) {
         // Don't error - might be an "other" option or valid value
@@ -336,7 +350,11 @@ export class ResponseValidatorService {
     basePath: string,
     errors: ValidationError[],
   ): void {
-    if (typeof answer !== 'boolean' && answer !== 'true' && answer !== 'false') {
+    if (
+      typeof answer !== 'boolean' &&
+      answer !== 'true' &&
+      answer !== 'false'
+    ) {
       errors.push({
         path: basePath,
         message: 'Boolean answer must be true or false',
@@ -349,7 +367,13 @@ export class ResponseValidatorService {
    * Apply a SurveyJS validator
    */
   private applyValidator(
-    validator: { type: string; regex?: string; text?: string; minLength?: number; maxLength?: number },
+    validator: {
+      type: string;
+      regex?: string;
+      text?: string;
+      minLength?: number;
+      maxLength?: number;
+    },
     answer: unknown,
     basePath: string,
     errors: ValidationError[],
@@ -374,17 +398,27 @@ export class ResponseValidatorService {
 
       case 'text':
         if (typeof answer === 'string') {
-          if (validator.minLength !== undefined && answer.length < validator.minLength) {
+          if (
+            validator.minLength !== undefined &&
+            answer.length < validator.minLength
+          ) {
             errors.push({
               path: basePath,
-              message: validator.text || `Minimum ${validator.minLength} characters required`,
+              message:
+                validator.text ||
+                `Minimum ${validator.minLength} characters required`,
               code: 'MIN_LENGTH',
             });
           }
-          if (validator.maxLength !== undefined && answer.length > validator.maxLength) {
+          if (
+            validator.maxLength !== undefined &&
+            answer.length > validator.maxLength
+          ) {
             errors.push({
               path: basePath,
-              message: validator.text || `Maximum ${validator.maxLength} characters allowed`,
+              message:
+                validator.text ||
+                `Maximum ${validator.maxLength} characters allowed`,
               code: 'MAX_LENGTH',
             });
           }
@@ -420,7 +454,9 @@ export class ResponseValidatorService {
    * Get all questions from all pages (normalized to common format)
    * Supports both internal format and SurveyJS format
    */
-  private getAllQuestions(schema: SurveySchema | Record<string, unknown>): NormalizedQuestion[] {
+  private getAllQuestions(
+    schema: SurveySchema | Record<string, unknown>,
+  ): NormalizedQuestion[] {
     const questions: NormalizedQuestion[] = [];
     const pages = (schema as Record<string, unknown>).pages as unknown[];
 
@@ -436,7 +472,7 @@ export class ResponseValidatorService {
       if (elements && Array.isArray(elements)) {
         for (const element of elements) {
           const q = element as Record<string, unknown>;
-          
+
           // Normalize the question
           const normalized: NormalizedQuestion = {
             // Support both 'id' and 'name'
@@ -445,8 +481,9 @@ export class ResponseValidatorService {
             // Title might not exist in SurveyJS
             title: (q.title || q.name) as string,
             // Support both 'isRequired' (SurveyJS) and 'validation.required' (internal)
-            isRequired: q.isRequired === true || 
-                       (q.validation as Record<string, unknown>)?.required === true,
+            isRequired:
+              q.isRequired === true ||
+              (q.validation as Record<string, unknown>)?.required === true,
             // SurveyJS properties
             choices: q.choices as NormalizedQuestion['choices'],
             rateMin: q.rateMin as number,

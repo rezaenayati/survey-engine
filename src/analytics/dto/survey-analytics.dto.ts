@@ -1,7 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsEnum } from 'class-validator';
-import { VersionMode, AnswerFilterDto, AnalyticsQueryDto } from './analytics-query.dto';
-import { AnalyticsSummaryDto, AnalyticsFunnelDto, AnalyticsTrendsDto } from './analytics-result.dto';
+import {
+  VersionMode,
+  AnswerFilterDto,
+  AnalyticsQueryDto,
+} from './analytics-query.dto';
+import {
+  AnalyticsSummaryDto,
+  AnalyticsFunnelDto,
+  AnalyticsTrendsDto,
+} from './analytics-result.dto';
 import { QuestionAnalyticsDto } from './question-analytics.dto';
 
 export class AppliedFiltersDto {
@@ -17,7 +25,10 @@ export class AppliedFiltersDto {
   @ApiPropertyOptional({ description: 'Number of respondent IDs filtered' })
   respondentIdsCount?: number;
 
-  @ApiPropertyOptional({ description: 'Answer filters applied', type: [AnswerFilterDto] })
+  @ApiPropertyOptional({
+    description: 'Answer filters applied',
+    type: [AnswerFilterDto],
+  })
   answerFilters?: AnswerFilterDto[];
 
   @ApiPropertyOptional({ description: 'Response status filter' })
@@ -40,13 +51,19 @@ export class SurveyAnalyticsDto {
   @ApiProperty({ description: 'Response trends', type: AnalyticsTrendsDto })
   trends: AnalyticsTrendsDto;
 
-  @ApiProperty({ description: 'Per-question analytics', type: [QuestionAnalyticsDto] })
+  @ApiProperty({
+    description: 'Per-question analytics',
+    type: [QuestionAnalyticsDto],
+  })
   questions: QuestionAnalyticsDto[];
 
   @ApiProperty({ description: 'Analytics generation timestamp' })
   generatedAt: string;
 
-  @ApiPropertyOptional({ description: 'Filters applied to this report', type: AppliedFiltersDto })
+  @ApiPropertyOptional({
+    description: 'Filters applied to this report',
+    type: AppliedFiltersDto,
+  })
   appliedFilters?: AppliedFiltersDto;
 }
 
@@ -56,7 +73,11 @@ export enum ExportFormat {
 }
 
 export class ExportQueryDto extends AnalyticsQueryDto {
-  @ApiPropertyOptional({ description: 'Export format', enum: ExportFormat, default: ExportFormat.JSON })
+  @ApiPropertyOptional({
+    description: 'Export format',
+    enum: ExportFormat,
+    default: ExportFormat.JSON,
+  })
   @IsOptional()
   @IsEnum(ExportFormat)
   format?: ExportFormat = ExportFormat.JSON;
