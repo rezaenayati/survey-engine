@@ -1,13 +1,13 @@
 import { Test } from '@nestjs/testing';
-import { LogicEngineService } from '../../../src/validation/services/logic-engine.service';
-import { SchemaValidatorService } from '../../../src/validation/services/schema-validator.service';
+import { LogicEngineService } from '../../../src/schema/services/logic-engine.service';
+import { SchemaValidatorService } from '../../../src/schema/services/schema-validator.service';
 import {
   ComparisonOperator,
   LogicalOperator,
   RuleType,
   LogicSchema,
-} from '../../../src/validation/interfaces/logic-rules.interface';
-import { SurveySchema } from '../../../src/validation/interfaces/survey-schema.interface';
+} from '../../../src/schema/interfaces/logic-rules.interface';
+import { SurveySchema } from '../../../src/schema/interfaces/survey-schema.interface';
 
 /** Minimal two-page schema with four questions */
 const baseSchema: SurveySchema = {

@@ -2,12 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SurveyStatus } from '../../common/constants/status.constants';
 import type { SurveySettings } from '../entities/survey.entity';
 
-export class SurveyResponseDto {
+export class SurveyDto {
   @ApiProperty()
   id: string;
-
-  @ApiProperty()
-  tenantId: string;
 
   @ApiProperty()
   createdBy: string;
@@ -40,7 +37,7 @@ export class SurveyResponseDto {
   updatedAt: Date;
 }
 
-export class SurveyVersionResponseDto {
+export class SurveyVersionDto {
   @ApiProperty()
   id: string;
 

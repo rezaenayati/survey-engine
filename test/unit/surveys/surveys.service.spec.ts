@@ -3,9 +3,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { SurveysService } from '../../../src/surveys/surveys.service';
 import { Survey } from '../../../src/surveys/entities/survey.entity';
-import { SurveyVersion } from '../../../src/surveys/entities/survey-version.entity';
-import { SchemaValidatorService } from '../../../src/validation/services/schema-validator.service';
-import { LogicEngineService } from '../../../src/validation/services/logic-engine.service';
+import { SchemaValidatorService } from '../../../src/schema/services/schema-validator.service';
+import { LogicEngineService } from '../../../src/schema/services/logic-engine.service';
 import { SurveyStatus } from '../../../src/common/constants/status.constants';
 import type { RequestContext } from '../../../src/common/interfaces/request-context.interface';
 
@@ -39,11 +38,9 @@ function mockRepo<T>(overrides: Partial<Record<string, jest.Mock>> = {}): jest.M
 describe('SurveysService', () => {
   let service: SurveysService;
   let surveyRepo: ReturnType<typeof mockRepo>;
-  let versionRepo: ReturnType<typeof mockRepo>;
 
   beforeEach(async () => {
     surveyRepo = mockRepo();
-    versionRepo = mockRepo();
 
     const module = await Test.createTestingModule({
       providers: [
@@ -51,7 +48,6 @@ describe('SurveysService', () => {
         SchemaValidatorService,
         LogicEngineService,
         { provide: getRepositoryToken(Survey), useValue: surveyRepo },
-        { provide: getRepositoryToken(SurveyVersion), useValue: versionRepo },
       ],
     }).compile();
 
@@ -124,70 +120,4 @@ describe('SurveysService', () => {
     });
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // publish
-  // ──────────────────────────────────────────────────────────────────────────
-
-  describe('publish', () => {
-    it('creates a version and updates survey status to PUBLISHED', async () => {
-      const existing = {
-        id: 's1',
-        status: SurveyStatus.DRAFT,
-        draftSchemaJson: validSchema,
-        draftLogicJson: null,
-      };
-      // First findOne call (in publish) returns draft; second (final return) returns published
-      surveyRepo.findOne
-        .mockResolvedValueOnce(existing)
-        .mockResolvedValueOnce({ ...existing, status: SurveyStatus.PUBLISHED, activeVersionId: 'v1' });
-
-      versionRepo.findOne.mockResolvedValue(null); // no previous versions
-      versionRepo.save.mockResolvedValue({ id: 'v1', versionNumber: 1 });
-
-      const result = await service.publish(ctx, 's1');
-      expect(result.status).toBe(SurveyStatus.PUBLISHED);
-      expect(versionRepo.save).toHaveBeenCalled();
-      expect(surveyRepo.update).toHaveBeenCalledWith('s1', expect.objectContaining({ status: SurveyStatus.PUBLISHED }));
-    });
-
-    it('throws BadRequestException when survey has no schema', async () => {
-      surveyRepo.findOne.mockResolvedValue({ id: 's1', status: SurveyStatus.DRAFT, draftSchemaJson: null });
-      await expect(service.publish(ctx, 's1')).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('throws BadRequestException when publishing an archived survey', async () => {
-      surveyRepo.findOne.mockResolvedValue({ id: 's1', status: SurveyStatus.ARCHIVED });
-      await expect(service.publish(ctx, 's1')).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('increments versionNumber when previous version exists', async () => {
-      const existing = { id: 's1', status: SurveyStatus.DRAFT, draftSchemaJson: validSchema, draftLogicJson: null };
-      surveyRepo.findOne.mockResolvedValue(existing);
-      versionRepo.findOne.mockResolvedValue({ versionNumber: 3 });
-      versionRepo.save.mockResolvedValue({ id: 'v4', versionNumber: 4 });
-
-      await service.publish(ctx, 's1');
-      expect(versionRepo.create).toHaveBeenCalledWith(expect.objectContaining({ versionNumber: 4 }));
-    });
-  });
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // getRuntime
-  // ──────────────────────────────────────────────────────────────────────────
-
-  describe('getRuntime', () => {
-    it('returns active version for a published survey', async () => {
-      surveyRepo.findOne.mockResolvedValue({ id: 's1', status: SurveyStatus.PUBLISHED, activeVersionId: 'v1' });
-      const version = { id: 'v1', schemaJson: validSchema };
-      versionRepo.findOne.mockResolvedValue(version);
-
-      const result = await service.getRuntime(ctx, 's1');
-      expect(result).toBe(version);
-    });
-
-    it('throws BadRequestException when survey has no published version', async () => {
-      surveyRepo.findOne.mockResolvedValue({ id: 's1', activeVersionId: null });
-      await expect(service.getRuntime(ctx, 's1')).rejects.toBeInstanceOf(BadRequestException);
-    });
-  });
 });

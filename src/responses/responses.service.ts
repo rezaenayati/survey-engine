@@ -16,13 +16,13 @@ import {
   PaginationQueryDto,
   PaginatedResponseDto,
 } from '../common/dto/pagination.dto';
-import { StartResponseDto, UpdateResponseDto } from './dto/create-response.dto';
+import { StartResponseDto, UpdateResponseDto } from './dto/response.dto';
 import {
   ResponseValidatorService,
   LogicEngineService,
   SurveySchema,
   LogicSchema,
-} from '../validation';
+} from '../schema';
 
 @Injectable()
 export class ResponsesService {
@@ -94,14 +94,11 @@ export class ResponsesService {
     if (surveyId) {
       // When filtering by survey, verify the caller owns that survey so they
       // can see all its responses (survey-owner view).
-      const version = await this.surveysService.getRuntime(ctx, surveyId);
       const survey = await this.surveysService.findOne(ctx, surveyId);
       if (survey.createdBy && ctx.userId && survey.createdBy !== ctx.userId) {
         throw new ForbiddenException('You do not have access to this survey\'s responses');
       }
       where.surveyId = surveyId;
-      // Suppress unused variable warning
-      void version;
     } else {
       // Without a surveyId, scope to the caller's own submitted responses
       where.respondentId = ctx.userId ?? '';

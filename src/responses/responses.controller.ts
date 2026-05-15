@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,7 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ResponsesService } from './responses.service';
-import { StartResponseDto, UpdateResponseDto } from './dto/create-response.dto';
+import { StartResponseDto, UpdateResponseDto } from './dto/response.dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
 import {
@@ -74,7 +75,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async findOne(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<Response> {
     return this.responsesService.findOne(ctx, id);
   }
@@ -87,7 +88,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async update(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateResponseDto,
   ): Promise<Response> {
     return this.responsesService.update(ctx, id, dto);
@@ -101,7 +102,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async complete(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<Response> {
     return this.responsesService.complete(ctx, id);
   }
@@ -114,7 +115,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async remove(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     return this.responsesService.remove(ctx, id);
   }
@@ -126,7 +127,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async validate(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{
     valid: boolean;
     errors: unknown[];
@@ -145,7 +146,7 @@ export class ResponsesController {
   @ApiResponse({ status: 404, description: 'Response not found' })
   async evaluateLogic(
     @GetContext() ctx: RequestContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{
     visibleQuestions: string[];
     hiddenQuestions: string[];

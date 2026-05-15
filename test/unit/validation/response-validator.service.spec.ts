@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
-import { ResponseValidatorService } from '../../../src/validation/services/response-validator.service';
-import { SchemaValidatorService } from '../../../src/validation/services/schema-validator.service';
+import { ResponseValidatorService } from '../../../src/schema/services/response-validator.service';
+import { SchemaValidatorService } from '../../../src/schema/services/schema-validator.service';
 
 /** SurveyJS-format schema with several question types */
 const schema = {

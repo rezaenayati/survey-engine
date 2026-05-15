@@ -4,7 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {default as request} from 'supertest';
 import { SurveysModule } from '../../src/surveys/surveys.module';
 import { ResponsesModule } from '../../src/responses/responses.module';
-import { ValidationModule } from '../../src/validation/validation.module';
+import { SchemaModule } from '../../src/schema/schema.module';
 import { ConfigModule } from '@nestjs/config';
 import { startTestDatabase, stopTestDatabase } from '../helpers/test-database';
 import { App } from 'supertest/types';
@@ -43,7 +43,7 @@ describe('Responses API (e2e)', () => {
           synchronize: true,
           logging: false,
         }),
-        ValidationModule,
+        SchemaModule,
         SurveysModule,
         ResponsesModule,
       ],

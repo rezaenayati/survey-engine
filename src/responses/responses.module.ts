@@ -6,12 +6,14 @@ import { ResponsesController } from './responses.controller';
 import { ResponsesService } from './responses.service';
 import { SurveysModule } from '../surveys/surveys.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { SchemaModule } from '../schema/schema.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Response, SurveyVersion]),
     SurveysModule,
     WebhooksModule,
+    SchemaModule,
   ],
   controllers: [ResponsesController],
   providers: [ResponsesService],

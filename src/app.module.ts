@@ -7,8 +7,8 @@ import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { LoggerModule } from 'nestjs-pino';
 import { SurveysModule } from './surveys/surveys.module';
 import { ResponsesModule } from './responses/responses.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
-import { ValidationModule } from './validation/validation.module';
 
 @Module({
   imports: [
@@ -70,9 +70,9 @@ import { ValidationModule } from './validation/validation.module';
       }),
     }),
 
-    ValidationModule,
     SurveysModule,
     ResponsesModule,
+    AnalyticsModule,
     HealthModule,
   ],
   providers: [

@@ -2,8 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { Response } from '../responses/entities/response.entity';
-import { Survey } from './entities/survey.entity';
-import { SurveyVersion } from './entities/survey-version.entity';
+import { Survey } from '../surveys/entities/survey.entity';
+import { SurveyVersion } from '../surveys/entities/survey-version.entity';
 import { ResponseStatus } from '../common/constants/status.constants';
 import { RequestContext } from '../common/interfaces/request-context.interface';
 import {
@@ -25,9 +25,6 @@ import {
   TextResponseItemDto,
 } from './dto/analytics.dto';
 
-/**
- * Common English stop words to filter out from text analysis
- */
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
   'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been',
@@ -44,9 +41,6 @@ const STOP_WORDS = new Set([
   'her', 'our', 'their', 'me', 'him', 'us', 'them', 'myself', 'yourself',
 ]);
 
-/**
- * Merged choice option across versions
- */
 interface MergedChoice {
   questionId: string;
   value: string;
@@ -55,9 +49,6 @@ interface MergedChoice {
   isInLatestVersion: boolean;
 }
 
-/**
- * Extracted question from schema
- */
 interface ExtractedQuestion {
   id: string;
   type: string;
@@ -77,39 +68,27 @@ export class AnalyticsService {
     private readonly versionRepository: Repository<SurveyVersion>,
   ) {}
 
-  /**
-   * Get complete analytics for a survey using database aggregations
-   */
   async getAnalytics(
     ctx: RequestContext,
     surveyId: string,
     query: AnalyticsQueryDto,
   ): Promise<SurveyAnalyticsDto> {
-    const survey = await this.surveyRepository.findOne({
-      where: { id: surveyId },
-    });
+    const survey = await this.surveyRepository.findOne({ where: { id: surveyId } });
 
-    if (!survey) {
-      throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
-    }
+    if (!survey) throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
 
     if (survey.createdBy && ctx.userId && survey.createdBy !== ctx.userId) {
       throw new ForbiddenException('You do not have access to this survey');
     }
 
-    // Validate version mode
     if (query.versionMode === VersionMode.SPECIFIC && !query.versionId) {
       throw new BadRequestException('versionId is required when versionMode is "specific"');
     }
 
-    // Get versions for schema analysis
     const versions = await this.getRelevantVersions(surveyId, query);
     const versionNumbers = versions.map(v => v.versionNumber);
-
-    // Build base query with all filters
     const baseQuery = this.buildBaseQuery(ctx, surveyId, query);
 
-    // Calculate all analytics using database aggregations
     const [summary, funnel, trends, questions] = await Promise.all([
       this.calculateSummaryDB(baseQuery.clone(), versionNumbers),
       this.calculateFunnelDB(baseQuery.clone(), query.staleDays || 7),
@@ -129,9 +108,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Get summary statistics using database aggregations
-   */
   async getSummary(
     ctx: RequestContext,
     surveyId: string,
@@ -143,9 +119,6 @@ export class AnalyticsService {
     return this.calculateSummaryDB(baseQuery, versions.map(v => v.versionNumber));
   }
 
-  /**
-   * Get funnel data using database aggregations
-   */
   async getFunnel(
     ctx: RequestContext,
     surveyId: string,
@@ -156,9 +129,6 @@ export class AnalyticsService {
     return this.calculateFunnelDB(baseQuery, query.staleDays || 7);
   }
 
-  /**
-   * Get trends data using database aggregations
-   */
   async getTrends(
     ctx: RequestContext,
     surveyId: string,
@@ -169,9 +139,6 @@ export class AnalyticsService {
     return this.calculateTrendsDB(baseQuery);
   }
 
-  /**
-   * Get per-question analytics
-   */
   async getQuestionAnalytics(
     ctx: RequestContext,
     surveyId: string,
@@ -182,9 +149,6 @@ export class AnalyticsService {
     return this.calculateQuestionAnalyticsDB(ctx, surveyId, query, versions);
   }
 
-  /**
-   * Export analytics data
-   */
   async exportAnalytics(
     ctx: RequestContext,
     surveyId: string,
@@ -194,9 +158,8 @@ export class AnalyticsService {
     const analytics = await this.getAnalytics(ctx, surveyId, query);
 
     if (format === 'csv') {
-      const csv = this.convertToCSV(analytics);
       return {
-        data: csv,
+        data: this.convertToCSV(analytics),
         contentType: 'text/csv',
         filename: `survey-analytics-${surveyId}-${Date.now()}.csv`,
       };
@@ -209,9 +172,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Get paginated text responses for a specific question
-   */
   async getTextResponses(
     ctx: RequestContext,
     surveyId: string,
@@ -221,19 +181,15 @@ export class AnalyticsService {
     await this.verifySurveyExists(ctx, surveyId);
 
     const page = query.page || 1;
-    const limit = Math.min(query.limit || 20, 100); // Max 100 per page
+    const limit = Math.min(query.limit || 20, 100);
     const offset = (page - 1) * limit;
 
-    // Get question title from schema
     const versions = await this.getRelevantVersions(surveyId, query);
     const mergedQuestions = this.mergeQuestionsAcrossVersions(versions);
-    const questionInfo = mergedQuestions.get(questionId);
-    const questionTitle = questionInfo?.title || questionId;
+    const questionTitle = mergedQuestions.get(questionId)?.title || questionId;
 
-    // Build base query
     const baseQuery = this.buildBaseQuery(ctx, surveyId, query);
 
-    // Build text responses query
     let textQuery = baseQuery
       .clone()
       .select([
@@ -248,7 +204,6 @@ export class AnalyticsService {
       .andWhere(`"r"."answersJson"->>:questionId != ''`)
       .setParameters({ questionId });
 
-    // Apply search filter if provided
     if (query.search) {
       textQuery = textQuery.andWhere(
         `"r"."answersJson"->>:questionId ILIKE :search`,
@@ -256,7 +211,6 @@ export class AnalyticsService {
       );
     }
 
-    // Get total count
     const countResult = await textQuery
       .clone()
       .select('COUNT(*)::int as total')
@@ -265,7 +219,6 @@ export class AnalyticsService {
 
     const total = parseInt(countResult?.total, 10) || 0;
 
-    // Get paginated results
     const results = await textQuery
       .orderBy('r.completedAt', 'DESC')
       .offset(offset)
@@ -282,25 +235,11 @@ export class AnalyticsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
-      questionId,
-      questionTitle,
-      items,
-      total,
-      page,
-      limit,
-      totalPages,
-      hasMore: page < totalPages,
-    };
+    return { questionId, questionTitle, items, total, page, limit, totalPages, hasMore: page < totalPages };
   }
 
-  // ========================================
-  // DATABASE QUERY BUILDERS
-  // ========================================
+  // ── Base query builder ────────────────────────────────────────────────────
 
-  /**
-   * Build base query with all filters applied
-   */
   private buildBaseQuery(
     ctx: RequestContext,
     surveyId: string,
@@ -310,42 +249,24 @@ export class AnalyticsService {
       .createQueryBuilder('r')
       .where('r.surveyId = :surveyId', { surveyId });
 
-    // Date filters
-    if (query.startDate) {
-      qb.andWhere('r.startedAt >= :startDate', { startDate: new Date(query.startDate) });
-    }
-    if (query.endDate) {
-      qb.andWhere('r.startedAt <= :endDate', { endDate: new Date(query.endDate) });
-    }
+    if (query.startDate) qb.andWhere('r.startedAt >= :startDate', { startDate: new Date(query.startDate) });
+    if (query.endDate) qb.andWhere('r.startedAt <= :endDate', { endDate: new Date(query.endDate) });
 
-    // Version filter
     if (query.versionMode === VersionMode.SPECIFIC && query.versionId) {
       qb.andWhere('r.surveyVersionId = :versionId', { versionId: query.versionId });
     }
 
-    // Status filter
-    if (query.status) {
-      qb.andWhere('r.status = :status', { status: query.status });
+    if (query.status) qb.andWhere('r.status = :status', { status: query.status });
+
+    if (query.respondentIds?.length) {
+      qb.andWhere('r.respondentId IN (:...respondentIds)', { respondentIds: query.respondentIds });
     }
 
-    // Respondent IDs filter (for external segmentation)
-    if (query.respondentIds && query.respondentIds.length > 0) {
-      qb.andWhere('r.respondentId IN (:...respondentIds)', {
-        respondentIds: query.respondentIds,
-      });
-    }
-
-    // Answer filters (cross-question filtering)
-    if (query.answerFilters && query.answerFilters.length > 0) {
-      this.applyAnswerFilters(qb, query.answerFilters);
-    }
+    if (query.answerFilters?.length) this.applyAnswerFilters(qb, query.answerFilters);
 
     return qb;
   }
 
-  /**
-   * Apply cross-question answer filters using JSONB queries
-   */
   private applyAnswerFilters(
     qb: SelectQueryBuilder<Response>,
     filters: AnswerFilterDto[],
@@ -357,85 +278,60 @@ export class AnalyticsService {
       switch (filter.operator) {
         case FilterOperator.EQUALS:
           qb.andWhere(`"r"."answersJson"->>:${questionIdKey} = :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: String(filter.value),
+            [questionIdKey]: filter.questionId, [paramKey]: String(filter.value),
           });
           break;
-
         case FilterOperator.NOT_EQUALS:
-          qb.andWhere(
-            new Brackets((sub) => {
-              sub
-                .where(`"r"."answersJson"->>:${questionIdKey} != :${paramKey}`, {
-                  [questionIdKey]: filter.questionId,
-                  [paramKey]: String(filter.value),
-                })
-                .orWhere(`"r"."answersJson"->>:${questionIdKey} IS NULL`, {
-                  [questionIdKey]: filter.questionId,
-                });
-            }),
-          );
+          qb.andWhere(new Brackets((sub) => {
+            sub
+              .where(`"r"."answersJson"->>:${questionIdKey} != :${paramKey}`, {
+                [questionIdKey]: filter.questionId, [paramKey]: String(filter.value),
+              })
+              .orWhere(`"r"."answersJson"->>:${questionIdKey} IS NULL`, { [questionIdKey]: filter.questionId });
+          }));
           break;
-
         case FilterOperator.CONTAINS:
           qb.andWhere(`"r"."answersJson"->>:${questionIdKey} ILIKE :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: `%${filter.value}%`,
+            [questionIdKey]: filter.questionId, [paramKey]: `%${filter.value}%`,
           });
           break;
-
         case FilterOperator.IN:
           if (Array.isArray(filter.value)) {
             qb.andWhere(`"r"."answersJson"->>:${questionIdKey} IN (:...${paramKey})`, {
-              [questionIdKey]: filter.questionId,
-              [paramKey]: filter.value.map(String),
+              [questionIdKey]: filter.questionId, [paramKey]: filter.value.map(String),
             });
           }
           break;
-
         case FilterOperator.GT:
           qb.andWhere(`("r"."answersJson"->>:${questionIdKey})::numeric > :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: Number(filter.value),
+            [questionIdKey]: filter.questionId, [paramKey]: Number(filter.value),
           });
           break;
-
         case FilterOperator.LT:
           qb.andWhere(`("r"."answersJson"->>:${questionIdKey})::numeric < :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: Number(filter.value),
+            [questionIdKey]: filter.questionId, [paramKey]: Number(filter.value),
           });
           break;
-
         case FilterOperator.GTE:
           qb.andWhere(`("r"."answersJson"->>:${questionIdKey})::numeric >= :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: Number(filter.value),
+            [questionIdKey]: filter.questionId, [paramKey]: Number(filter.value),
           });
           break;
-
         case FilterOperator.LTE:
           qb.andWhere(`("r"."answersJson"->>:${questionIdKey})::numeric <= :${paramKey}`, {
-            [questionIdKey]: filter.questionId,
-            [paramKey]: Number(filter.value),
+            [questionIdKey]: filter.questionId, [paramKey]: Number(filter.value),
           });
           break;
       }
     });
   }
 
-  // ========================================
-  // DATABASE AGGREGATION METHODS
-  // ========================================
+  // ── DB aggregations ───────────────────────────────────────────────────────
 
-  /**
-   * Calculate summary statistics using PostgreSQL aggregations
-   */
   private async calculateSummaryDB(
     qb: SelectQueryBuilder<Response>,
     versionsIncluded: number[],
   ): Promise<AnalyticsSummaryDto> {
-    // Main aggregation query
     const result = await qb
       .select([
         'COUNT(*)::int as total',
@@ -444,20 +340,16 @@ export class AnalyticsService {
       ])
       .getRawOne();
 
-    // Get median completion time (requires separate query for PERCENTILE_CONT)
     const medianResult = await this.responseRepository
       .createQueryBuilder('r')
-      .select(
-        `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) as median_time`,
-      )
+      .select(`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) as median_time`)
       .where(qb.getQuery().replace(/SELECT.*FROM/, 'r.id IN (SELECT r.id FROM'))
       .andWhere(`r.status = '${ResponseStatus.COMPLETED}'`)
       .andWhere('r.completedAt IS NOT NULL')
       .setParameters(qb.getParameters())
       .getRawOne()
-      .catch(() => ({ median_time: 0 })); // Fallback if query fails
+      .catch(() => ({ median_time: 0 }));
 
-    // Count by status
     const statusCounts = await qb
       .clone()
       .select(['r.status as status', 'COUNT(*)::int as count'])
@@ -465,11 +357,8 @@ export class AnalyticsService {
       .getRawMany();
 
     const responsesByStatus: Record<string, number> = {};
-    for (const row of statusCounts) {
-      responsesByStatus[row.status] = parseInt(row.count, 10);
-    }
+    for (const row of statusCounts) responsesByStatus[row.status] = parseInt(row.count, 10);
 
-    // Today and this week counts
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(todayStart);
@@ -500,9 +389,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Calculate funnel data using PostgreSQL aggregations
-   */
   private async calculateFunnelDB(
     qb: SelectQueryBuilder<Response>,
     staleDays: number,
@@ -530,11 +416,7 @@ export class AnalyticsService {
     const staleResponses = parseInt(result.stale, 10) || 0;
 
     return {
-      total,
-      started,
-      inProgress,
-      completed,
-      abandoned,
+      total, started, inProgress, completed, abandoned,
       activeResponses: started + inProgress,
       staleResponses,
       completionRate: total > 0 ? Math.round((completed / total) * 100 * 10) / 10 : 0,
@@ -543,13 +425,7 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Calculate trends using PostgreSQL aggregations
-   */
-  private async calculateTrendsDB(
-    qb: SelectQueryBuilder<Response>,
-  ): Promise<AnalyticsTrendsDto> {
-    // Daily trends
+  private async calculateTrendsDB(qb: SelectQueryBuilder<Response>): Promise<AnalyticsTrendsDto> {
     const dailyResults = await qb
       .clone()
       .select([
@@ -561,7 +437,6 @@ export class AnalyticsService {
       .orderBy('date', 'ASC')
       .getRawMany();
 
-    // Weekly trends (start of week = Monday)
     const weeklyResults = await qb
       .clone()
       .select([
@@ -573,45 +448,28 @@ export class AnalyticsService {
       .orderBy('date', 'ASC')
       .getRawMany();
 
-    const daily: TrendDataPointDto[] = dailyResults.map((row) => ({
-      date: row.date,
-      count: parseInt(row.count, 10),
-      completed: parseInt(row.completed, 10),
-    }));
+    const mapRow = (row: Record<string, unknown>): TrendDataPointDto => ({
+      date: row.date as string,
+      count: parseInt(row.count as string, 10),
+      completed: parseInt(row.completed as string, 10),
+    });
 
-    const weekly: TrendDataPointDto[] = weeklyResults.map((row) => ({
-      date: row.date,
-      count: parseInt(row.count, 10),
-      completed: parseInt(row.completed, 10),
-    }));
-
-    return { daily, weekly };
+    return { daily: dailyResults.map(mapRow), weekly: weeklyResults.map(mapRow) };
   }
 
-  /**
-   * Calculate per-question analytics with version handling
-   */
   private async calculateQuestionAnalyticsDB(
     ctx: RequestContext,
     surveyId: string,
     query: AnalyticsQueryDto,
     versions: SurveyVersion[],
   ): Promise<QuestionAnalyticsDto[]> {
-    if (versions.length === 0) {
-      return [];
-    }
+    if (versions.length === 0) return [];
 
-    // Get merged questions across versions
     const mergedQuestions = this.mergeQuestionsAcrossVersions(versions);
     const mergedChoices = this.mergeChoicesAcrossVersions(versions);
-    const latestVersion = versions.reduce((a, b) =>
-      a.versionNumber > b.versionNumber ? a : b,
-    );
-
-    // Build the base query for responses
+    const latestVersion = versions.reduce((a, b) => a.versionNumber > b.versionNumber ? a : b);
     const baseQuery = this.buildBaseQuery(ctx, surveyId, query);
 
-    // Get total completed responses count
     const totalResult = await baseQuery
       .clone()
       .select('COUNT(*)::int as total')
@@ -619,27 +477,18 @@ export class AnalyticsService {
       .getRawOne();
     const totalCompleted = parseInt(totalResult?.total, 10) || 0;
 
-    // Analyze each question
     const questionAnalytics: QuestionAnalyticsDto[] = [];
-
     for (const [questionId, questionInfo] of mergedQuestions) {
-      const analytics = await this.analyzeQuestionDB(
-        baseQuery.clone(),
-        questionId,
-        questionInfo,
-        totalCompleted,
-        mergedChoices,
-        latestVersion.versionNumber,
+      questionAnalytics.push(
+        await this.analyzeQuestionDB(
+          baseQuery.clone(), questionId, questionInfo,
+          totalCompleted, mergedChoices, latestVersion.versionNumber,
+        ),
       );
-      questionAnalytics.push(analytics);
     }
-
     return questionAnalytics;
   }
 
-  /**
-   * Analyze a single question using database queries
-   */
   private async analyzeQuestionDB(
     baseQuery: SelectQueryBuilder<Response>,
     questionId: string,
@@ -648,7 +497,6 @@ export class AnalyticsService {
     mergedChoices: Map<string, MergedChoice>,
     latestVersionNumber: number,
   ): Promise<QuestionAnalyticsDto> {
-    // Count answered vs skipped using JSONB
     const countResult = await baseQuery
       .clone()
       .select([
@@ -664,59 +512,32 @@ export class AnalyticsService {
                      questionInfo.versionNumber !== latestVersionNumber;
 
     const base: QuestionAnalyticsDto = {
-      questionId,
-      questionType: questionInfo.type,
-      questionTitle: questionInfo.title,
-      totalAnswers,
-      skipped,
-      isLegacy,
+      questionId, questionType: questionInfo.type, questionTitle: questionInfo.title,
+      totalAnswers, skipped, isLegacy,
       fromVersions: questionInfo.versionNumber ? [questionInfo.versionNumber] : undefined,
     };
 
-    // Type-specific analytics
     switch (questionInfo.type) {
       case 'radiogroup':
       case 'dropdown':
       case 'single_choice':
-        return this.analyzeChoiceQuestionDB(
-          baseQuery,
-          questionId,
-          base,
-          mergedChoices,
-          latestVersionNumber,
-          false,
-        );
-
+        return this.analyzeChoiceQuestionDB(baseQuery, questionId, base, mergedChoices, latestVersionNumber, false);
       case 'checkbox':
       case 'multiple_choice':
-        return this.analyzeChoiceQuestionDB(
-          baseQuery,
-          questionId,
-          base,
-          mergedChoices,
-          latestVersionNumber,
-          true,
-        );
-
+        return this.analyzeChoiceQuestionDB(baseQuery, questionId, base, mergedChoices, latestVersionNumber, true);
       case 'rating':
         return this.analyzeRatingQuestionDB(baseQuery, questionId, base);
-
       case 'boolean':
         return this.analyzeBooleanQuestionDB(baseQuery, questionId, base);
-
       case 'text':
       case 'comment':
       case 'textarea':
         return this.analyzeTextQuestionDB(baseQuery, questionId, base);
-
       default:
         return base;
     }
   }
 
-  /**
-   * Analyze choice question with legacy option support
-   */
   private async analyzeChoiceQuestionDB(
     baseQuery: SelectQueryBuilder<Response>,
     questionId: string,
@@ -725,8 +546,6 @@ export class AnalyticsService {
     latestVersionNumber: number,
     isMultiple: boolean,
   ): Promise<QuestionAnalyticsDto> {
-    // For choice questions, we need to get the answers and count in application code
-    // because JSONB array handling is complex across different scenarios
     const answersResult = await baseQuery
       .clone()
       .select([`"r"."answersJson"->'${questionId}' as answer`])
@@ -735,76 +554,47 @@ export class AnalyticsService {
       .getRawMany()
       .catch(() => []);
 
-    // Count answer values
     const counts = new Map<string, number>();
     for (const row of answersResult) {
       if (row.answer === null || row.answer === undefined) continue;
-
       if (isMultiple && Array.isArray(row.answer)) {
-        for (const val of row.answer) {
-          const key = String(val);
-          counts.set(key, (counts.get(key) || 0) + 1);
-        }
+        for (const val of row.answer) counts.set(String(val), (counts.get(String(val)) || 0) + 1);
       } else if (typeof row.answer === 'string' || typeof row.answer === 'number') {
         const key = String(row.answer);
         counts.set(key, (counts.get(key) || 0) + 1);
       }
     }
 
-    // Convert to results format
-    const results = Array.from(counts.entries()).map(([value, count]) => ({
-      value,
-      count,
-    }));
-
-    // Calculate total for percentages
-    const total = results.reduce((sum: number, r: { count: number }) => sum + r.count, 0);
-
-    // Build distribution with legacy option detection
+    const results = Array.from(counts.entries()).map(([value, count]) => ({ value, count }));
+    const total = results.reduce((sum, r) => sum + r.count, 0);
     const distribution: ChoiceDistributionDto[] = [];
     const seenValues = new Set<string>();
 
-    // First, add values that exist in answers
     for (const row of results) {
       const value = String(row.value);
       seenValues.add(value);
-
       const choiceKey = `${questionId}:${value}`;
       const mergedChoice = mergedChoices.get(choiceKey);
-
       distribution.push({
-        value,
-        label: mergedChoice?.label || value,
-        count: row.count,
+        value, label: mergedChoice?.label || value, count: row.count,
         percentage: total > 0 ? Math.round((row.count / total) * 100 * 10) / 10 : 0,
         isLegacy: mergedChoice ? !mergedChoice.isInLatestVersion : true,
         fromVersions: mergedChoice?.versions,
       });
     }
 
-    // Add any choices that exist in schema but have 0 count
     for (const [key, mergedChoice] of mergedChoices) {
       if (mergedChoice.questionId === questionId && !seenValues.has(mergedChoice.value)) {
         distribution.push({
-          value: mergedChoice.value,
-          label: mergedChoice.label,
-          count: 0,
-          percentage: 0,
-          isLegacy: !mergedChoice.isInLatestVersion,
-          fromVersions: mergedChoice.versions,
+          value: mergedChoice.value, label: mergedChoice.label, count: 0, percentage: 0,
+          isLegacy: !mergedChoice.isInLatestVersion, fromVersions: mergedChoice.versions,
         });
       }
     }
 
-    return {
-      ...base,
-      distribution: distribution.sort((a, b) => b.count - a.count),
-    };
+    return { ...base, distribution: distribution.sort((a, b) => b.count - a.count) };
   }
 
-  /**
-   * Analyze rating question using database aggregations
-   */
   private async analyzeRatingQuestionDB(
     baseQuery: SelectQueryBuilder<Response>,
     questionId: string,
@@ -825,13 +615,9 @@ export class AnalyticsService {
       .getRawOne()
       .catch(() => ({}));
 
-    // Get value distribution
     const distributionResult = await baseQuery
       .clone()
-      .select([
-        `"r"."answersJson"->>:questionId as value`,
-        'COUNT(*)::int as count',
-      ])
+      .select([`"r"."answersJson"->>:questionId as value`, 'COUNT(*)::int as count'])
       .andWhere(`r.status = '${ResponseStatus.COMPLETED}'`)
       .andWhere(`"r"."answersJson" ? :questionId`)
       .andWhere(`"r"."answersJson"->>:questionId ~ '^[0-9]+(\\.[0-9]+)?$'`)
@@ -842,11 +628,8 @@ export class AnalyticsService {
       .catch(() => []);
 
     const valueDistribution: Record<string, number> = {};
-    for (const row of distributionResult) {
-      valueDistribution[row.value] = parseInt(row.count, 10);
-    }
+    for (const row of distributionResult) valueDistribution[row.value] = parseInt(row.count, 10);
 
-    // Calculate median (need to get all values for this)
     const values = distributionResult.flatMap((row) =>
       Array(parseInt(row.count, 10)).fill(parseFloat(row.value)),
     );
@@ -856,18 +639,13 @@ export class AnalyticsService {
       ...base,
       average: statsResult?.avg ? Math.round(parseFloat(statsResult.avg) * 100) / 100 : undefined,
       median: Math.round(median * 100) / 100,
-      stdDeviation: statsResult?.stddev
-        ? Math.round(parseFloat(statsResult.stddev) * 100) / 100
-        : undefined,
+      stdDeviation: statsResult?.stddev ? Math.round(parseFloat(statsResult.stddev) * 100) / 100 : undefined,
       min: statsResult?.min ? parseFloat(statsResult.min) : undefined,
       max: statsResult?.max ? parseFloat(statsResult.max) : undefined,
       valueDistribution,
     };
   }
 
-  /**
-   * Analyze boolean question using database aggregations
-   */
   private async analyzeBooleanQuestionDB(
     baseQuery: SelectQueryBuilder<Response>,
     questionId: string,
@@ -890,36 +668,19 @@ export class AnalyticsService {
     const total = trueCount + falseCount;
 
     return {
-      ...base,
-      trueCount,
-      falseCount,
+      ...base, trueCount, falseCount,
       distribution: [
-        {
-          value: 'true',
-          label: 'Yes',
-          count: trueCount,
-          percentage: total > 0 ? Math.round((trueCount / total) * 100 * 10) / 10 : 0,
-        },
-        {
-          value: 'false',
-          label: 'No',
-          count: falseCount,
-          percentage: total > 0 ? Math.round((falseCount / total) * 100 * 10) / 10 : 0,
-        },
+        { value: 'true', label: 'Yes', count: trueCount, percentage: total > 0 ? Math.round((trueCount / total) * 100 * 10) / 10 : 0 },
+        { value: 'false', label: 'No', count: falseCount, percentage: total > 0 ? Math.round((falseCount / total) * 100 * 10) / 10 : 0 },
       ],
     };
   }
 
-  /**
-   * Analyze text question with sampling for word frequency
-   * Returns: avg length (from DB), word frequency (sampled), recent responses preview
-   */
   private async analyzeTextQuestionDB(
     baseQuery: SelectQueryBuilder<Response>,
     questionId: string,
     base: QuestionAnalyticsDto,
   ): Promise<QuestionAnalyticsDto> {
-    // Get text statistics using database aggregation (scales well)
     const statsResult = await baseQuery
       .clone()
       .select([
@@ -935,12 +696,7 @@ export class AnalyticsService {
       .catch(() => ({ avg_length: 0, total_text_responses: 0 }));
 
     const totalTextResponses = parseInt(statsResult?.total_text_responses, 10) || 0;
-    
-    // Sample size for word frequency analysis
-    const SAMPLE_SIZE = 500;
-    
-    // For word frequency, fetch a random sample for better representation
-    // Using TABLESAMPLE or random ordering for sampling
+
     const textAnswers = await baseQuery
       .clone()
       .select([`"r"."answersJson"->>:questionId as text`])
@@ -948,13 +704,12 @@ export class AnalyticsService {
       .andWhere(`"r"."answersJson" ? :questionId`)
       .andWhere(`"r"."answersJson"->>:questionId IS NOT NULL`)
       .andWhere(`"r"."answersJson"->>:questionId != ''`)
-      .orderBy('RANDOM()') // Random sample for better representation
-      .limit(SAMPLE_SIZE)
+      .orderBy('RANDOM()')
+      .limit(500)
       .setParameters({ questionId })
       .getRawMany()
       .catch(() => []);
 
-    // Get recent responses for preview (last 10)
     const recentAnswers = await baseQuery
       .clone()
       .select([`"r"."answersJson"->>:questionId as text`])
@@ -968,7 +723,6 @@ export class AnalyticsService {
       .getRawMany()
       .catch(() => []);
 
-    // Word frequency analysis on the sample
     const wordCounts = new Map<string, number>();
     for (const row of textAnswers) {
       if (row.text) {
@@ -977,10 +731,7 @@ export class AnalyticsService {
           .replace(/[^\w\s]/g, ' ')
           .split(/\s+/)
           .filter((w) => w.length > 2 && !STOP_WORDS.has(w));
-
-        for (const word of words) {
-          wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
-        }
+        for (const word of words) wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
       }
     }
 
@@ -989,12 +740,8 @@ export class AnalyticsService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 20);
 
-    // Extract recent responses text (truncate long ones)
     const recentResponses = recentAnswers
-      .map((row) => {
-        const text = String(row.text || '');
-        return text.length > 200 ? text.substring(0, 200) + '...' : text;
-      })
+      .map((row) => { const t = String(row.text || ''); return t.length > 200 ? t.substring(0, 200) + '...' : t; })
       .filter((t) => t.length > 0);
 
     return {
@@ -1006,151 +753,88 @@ export class AnalyticsService {
     };
   }
 
-  // ========================================
-  // VERSION HANDLING HELPERS
-  // ========================================
+  // ── Version helpers ───────────────────────────────────────────────────────
 
-  /**
-   * Get relevant versions based on query mode
-   */
-  private async getRelevantVersions(
-    surveyId: string,
-    query: AnalyticsQueryDto,
-  ): Promise<SurveyVersion[]> {
+  private async getRelevantVersions(surveyId: string, query: AnalyticsQueryDto): Promise<SurveyVersion[]> {
     if (query.versionMode === VersionMode.SPECIFIC && query.versionId) {
-      const version = await this.versionRepository.findOne({
-        where: { id: query.versionId, surveyId },
-      });
+      const version = await this.versionRepository.findOne({ where: { id: query.versionId, surveyId } });
       return version ? [version] : [];
     }
-
-    // Combined mode - get all versions
-    return this.versionRepository.find({
-      where: { surveyId },
-      order: { versionNumber: 'ASC' },
-    });
+    return this.versionRepository.find({ where: { surveyId }, order: { versionNumber: 'ASC' } });
   }
 
-  /**
-   * Merge questions across all versions
-   */
-  private mergeQuestionsAcrossVersions(
-    versions: SurveyVersion[],
-  ): Map<string, ExtractedQuestion> {
+  private mergeQuestionsAcrossVersions(versions: SurveyVersion[]): Map<string, ExtractedQuestion> {
     const merged = new Map<string, ExtractedQuestion>();
     const latestVersionNumber = Math.max(...versions.map((v) => v.versionNumber));
 
     for (const version of versions) {
-      const questions = this.extractQuestionsFromSchema(version.schemaJson);
-      for (const q of questions) {
-        if (!merged.has(q.id)) {
-          merged.set(q.id, {
-            ...q,
-            versionNumber: version.versionNumber,
-          });
-        }
-        // Update if this is the latest version
-        if (version.versionNumber === latestVersionNumber) {
-          merged.set(q.id, {
-            ...q,
-            versionNumber: version.versionNumber,
-          });
+      for (const q of this.extractQuestionsFromSchema(version.schemaJson)) {
+        if (!merged.has(q.id) || version.versionNumber === latestVersionNumber) {
+          merged.set(q.id, { ...q, versionNumber: version.versionNumber });
         }
       }
     }
-
     return merged;
   }
 
-  /**
-   * Merge choices across all versions with legacy detection
-   */
-  private mergeChoicesAcrossVersions(
-    versions: SurveyVersion[],
-  ): Map<string, MergedChoice> {
+  private mergeChoicesAcrossVersions(versions: SurveyVersion[]): Map<string, MergedChoice> {
     const merged = new Map<string, MergedChoice>();
     const latestVersionNumber = Math.max(...versions.map((v) => v.versionNumber));
 
     for (const version of versions) {
-      const questions = this.extractQuestionsFromSchema(version.schemaJson);
-      for (const q of questions) {
-        if (q.choices) {
-          for (const choice of q.choices) {
-            const value = typeof choice === 'object' ? String(choice.value) : String(choice);
-            const label = typeof choice === 'object' ? (choice.text || value) : value;
-            const key = `${q.id}:${value}`;
+      for (const q of this.extractQuestionsFromSchema(version.schemaJson)) {
+        if (!q.choices) continue;
+        for (const choice of q.choices) {
+          const value = typeof choice === 'object' ? String(choice.value) : String(choice);
+          const label = typeof choice === 'object' ? (choice.text || value) : value;
+          const key = `${q.id}:${value}`;
 
-            if (!merged.has(key)) {
-              merged.set(key, {
-                questionId: q.id,
-                value,
-                label,
-                versions: [version.versionNumber],
-                isInLatestVersion: version.versionNumber === latestVersionNumber,
-              });
-            } else {
-              const existing = merged.get(key)!;
-              if (!existing.versions.includes(version.versionNumber)) {
-                existing.versions.push(version.versionNumber);
-              }
-              if (version.versionNumber === latestVersionNumber) {
-                existing.isInLatestVersion = true;
-                existing.label = label; // Use latest label
-              }
+          if (!merged.has(key)) {
+            merged.set(key, {
+              questionId: q.id, value, label,
+              versions: [version.versionNumber],
+              isInLatestVersion: version.versionNumber === latestVersionNumber,
+            });
+          } else {
+            const existing = merged.get(key)!;
+            if (!existing.versions.includes(version.versionNumber)) existing.versions.push(version.versionNumber);
+            if (version.versionNumber === latestVersionNumber) {
+              existing.isInLatestVersion = true;
+              existing.label = label;
             }
           }
         }
       }
     }
-
     return merged;
   }
 
-  // ========================================
-  // UTILITY HELPERS
-  // ========================================
+  // ── Utility helpers ───────────────────────────────────────────────────────
 
   private async verifySurveyExists(_ctx: RequestContext, surveyId: string): Promise<void> {
-    const survey = await this.surveyRepository.findOne({
-      where: { id: surveyId },
-    });
-    if (!survey) {
-      throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
-    }
+    const survey = await this.surveyRepository.findOne({ where: { id: surveyId } });
+    if (!survey) throw new NotFoundException(`Survey with ID "${surveyId}" not found`);
   }
 
-  private extractQuestionsFromSchema(
-    schema: Record<string, unknown>,
-  ): ExtractedQuestion[] {
+  private extractQuestionsFromSchema(schema: Record<string, unknown>): ExtractedQuestion[] {
     const questions: ExtractedQuestion[] = [];
-    const pages = (schema.pages as unknown[]) || [];
-
-    for (const page of pages) {
+    for (const page of ((schema.pages as unknown[]) || [])) {
       const pageObj = page as Record<string, unknown>;
-      const elements = ((pageObj.questions || pageObj.elements) as unknown[]) || [];
-
-      for (const element of elements) {
+      for (const element of (((pageObj.questions || pageObj.elements) as unknown[]) || [])) {
         const q = element as Record<string, unknown>;
         const id = (q.id || q.name) as string;
         const type = q.type as string;
         const title = (q.title || q.name) as string;
         const choices = q.choices as Array<{ value: string; text?: string }> | undefined;
-
-        if (id && type) {
-          questions.push({ id, type, title, choices });
-        }
+        if (id && type) questions.push({ id, type, title, choices });
       }
     }
-
     return questions;
   }
 
   private buildAppliedFilters(query: AnalyticsQueryDto): AppliedFiltersDto {
     return {
-      dateRange:
-        query.startDate || query.endDate
-          ? { startDate: query.startDate, endDate: query.endDate }
-          : undefined,
+      dateRange: query.startDate || query.endDate ? { startDate: query.startDate, endDate: query.endDate } : undefined,
       versionMode: query.versionMode,
       versionId: query.versionId,
       respondentIdsCount: query.respondentIds?.length,
@@ -1161,33 +845,23 @@ export class AnalyticsService {
 
   private calculateMedian(numbers: number[]): number {
     if (numbers.length === 0) return 0;
-
     const sorted = [...numbers].sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
-
-    if (sorted.length % 2 === 0) {
-      return (sorted[mid - 1] + sorted[mid]) / 2;
-    }
-
-    return sorted[mid];
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   }
 
   private convertToCSV(analytics: SurveyAnalyticsDto): string {
-    const lines: string[] = [];
+    const lines: string[] = [
+      'SURVEY ANALYTICS REPORT',
+      `Survey: ${analytics.surveyName}`,
+      `Generated: ${analytics.generatedAt}`,
+      '',
+    ];
 
-    // Summary section
-    lines.push('SURVEY ANALYTICS REPORT');
-    lines.push(`Survey: ${analytics.surveyName}`);
-    lines.push(`Generated: ${analytics.generatedAt}`);
-    lines.push('');
-
-    // Applied filters
     if (analytics.appliedFilters) {
       lines.push('APPLIED FILTERS');
       if (analytics.appliedFilters.dateRange) {
-        lines.push(
-          `Date Range: ${analytics.appliedFilters.dateRange.startDate || 'any'} to ${analytics.appliedFilters.dateRange.endDate || 'any'}`,
-        );
+        lines.push(`Date Range: ${analytics.appliedFilters.dateRange.startDate || 'any'} to ${analytics.appliedFilters.dateRange.endDate || 'any'}`);
       }
       lines.push(`Version Mode: ${analytics.appliedFilters.versionMode || 'combined'}`);
       if (analytics.appliedFilters.respondentIdsCount) {
@@ -1196,52 +870,38 @@ export class AnalyticsService {
       lines.push('');
     }
 
-    // Summary stats
-    lines.push('SUMMARY');
-    lines.push(`Total Responses,${analytics.summary.totalResponses}`);
-    lines.push(`Completed Responses,${analytics.summary.completedResponses}`);
-    lines.push(`Completion Rate,${analytics.summary.completionRate}%`);
-    lines.push(`Avg Completion Time (sec),${analytics.summary.avgCompletionTime}`);
-    lines.push('');
+    lines.push(
+      'SUMMARY',
+      `Total Responses,${analytics.summary.totalResponses}`,
+      `Completed Responses,${analytics.summary.completedResponses}`,
+      `Completion Rate,${analytics.summary.completionRate}%`,
+      `Avg Completion Time (sec),${analytics.summary.avgCompletionTime}`,
+      '',
+      'COMPLETION FUNNEL',
+      `Total,${analytics.funnel.total}`,
+      `Started,${analytics.funnel.started}`,
+      `In Progress,${analytics.funnel.inProgress}`,
+      `Completed,${analytics.funnel.completed}`,
+      `Abandoned,${analytics.funnel.abandoned}`,
+      `Active (not finished),${analytics.funnel.activeResponses}`,
+      `Stale (inactive),${analytics.funnel.staleResponses}`,
+      '',
+      'QUESTION ANALYTICS',
+    );
 
-    // Funnel
-    lines.push('COMPLETION FUNNEL');
-    lines.push(`Total,${analytics.funnel.total}`);
-    lines.push(`Started,${analytics.funnel.started}`);
-    lines.push(`In Progress,${analytics.funnel.inProgress}`);
-    lines.push(`Completed,${analytics.funnel.completed}`);
-    lines.push(`Abandoned,${analytics.funnel.abandoned}`);
-    lines.push(`Active (not finished),${analytics.funnel.activeResponses}`);
-    lines.push(`Stale (inactive),${analytics.funnel.staleResponses}`);
-    lines.push('');
-
-    // Question analytics
-    lines.push('QUESTION ANALYTICS');
     for (const q of analytics.questions) {
-      lines.push('');
-      lines.push(`Question: ${q.questionTitle}${q.isLegacy ? ' [LEGACY]' : ''}`);
-      lines.push(`Type: ${q.questionType}`);
-      lines.push(`Total Answers: ${q.totalAnswers}`);
-      lines.push(`Skipped: ${q.skipped}`);
-
+      lines.push('', `Question: ${q.questionTitle}${q.isLegacy ? ' [LEGACY]' : ''}`,
+        `Type: ${q.questionType}`, `Total Answers: ${q.totalAnswers}`, `Skipped: ${q.skipped}`);
       if (q.distribution) {
         lines.push('Choice,Count,Percentage,Legacy');
-        for (const d of q.distribution) {
-          lines.push(`"${d.label}",${d.count},${d.percentage}%,${d.isLegacy ? 'Yes' : 'No'}`);
-        }
+        for (const d of q.distribution) lines.push(`"${d.label}",${d.count},${d.percentage}%,${d.isLegacy ? 'Yes' : 'No'}`);
       }
-
       if (q.average !== undefined) {
-        lines.push(`Average: ${q.average}`);
-        lines.push(`Median: ${q.median}`);
-        lines.push(`Std Deviation: ${q.stdDeviation}`);
+        lines.push(`Average: ${q.average}`, `Median: ${q.median}`, `Std Deviation: ${q.stdDeviation}`);
       }
-
-      if (q.wordFrequency && q.wordFrequency.length > 0) {
+      if (q.wordFrequency?.length) {
         lines.push('Word,Count');
-        for (const w of q.wordFrequency) {
-          lines.push(`"${w.word}",${w.count}`);
-        }
+        for (const w of q.wordFrequency) lines.push(`"${w.word}",${w.count}`);
       }
     }
 

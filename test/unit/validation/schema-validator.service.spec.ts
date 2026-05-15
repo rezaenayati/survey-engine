@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { SchemaValidatorService } from '../../../src/validation/services/schema-validator.service';
+import { SchemaValidatorService } from '../../../src/schema/services/schema-validator.service';
 
 /** Minimal valid SurveyJS schema */
 const minimalSchema = {
