@@ -191,31 +191,57 @@ Delivery is best-effort with up to 3 automatic retries (1s → 2s → 4s backoff
 
 ## API
 
+Full interactive docs (request bodies, response schemas, try-it-out) at `/api/docs`.
+
 ### Surveys
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/surveys` | Create a draft survey |
-| `GET` | `/surveys` | List your surveys (paginated) |
+| `GET` | `/surveys` | List surveys (paginated; authenticated users see own surveys, unauthenticated see published) |
 | `GET` | `/surveys/:id` | Get survey |
 | `PATCH` | `/surveys/:id` | Update draft schema / settings |
 | `DELETE` | `/surveys/:id` | Delete survey |
-| `POST` | `/surveys/:id/publish` | Publish — creates an immutable version snapshot |
-| `GET` | `/surveys/:id/versions` | List all versions |
-| `GET` | `/surveys/:id/runtime` | Get the active published version (for respondents) |
-| `GET` | `/surveys/:id/analytics` | Full analytics |
+| `POST` | `/surveys/:id/publish` | Publish — validates schema and creates an immutable version snapshot |
+| `GET` | `/surveys/:id/versions` | List all published versions |
+| `GET` | `/surveys/:id/versions/:versionId` | Get a specific version |
+| `GET` | `/surveys/:id/runtime` | Get the active published version (pass `schemaJson` to SurveyJS) |
+| `GET` | `/surveys/:id/validate` | Validate draft schema and logic rules — returns errors and warnings |
+| `POST` | `/surveys/:id/evaluate-logic` | Evaluate conditional logic against a given answer set |
 
 ### Responses
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/responses/start` | Start a response session |
-| `GET` | `/responses` | List your responses (or all for a survey you own) |
+| `POST` | `/responses/start` | Start a response session — pins respondent to the current active version |
+| `GET` | `/responses` | List responses (filterable by `surveyId`, `status`) |
+| `GET` | `/responses/:id` | Get a single response |
 | `PATCH` | `/responses/:id` | Save partial answers |
-| `POST` | `/responses/:id/complete` | Validate and submit |
+| `POST` | `/responses/:id/complete` | Validate required fields and submit |
 | `DELETE` | `/responses/:id` | Delete response |
+| `GET` | `/responses/:id/validate` | Validate current answers without submitting |
+| `GET` | `/responses/:id/logic` | Evaluate logic rules against current answers (visible/hidden questions, required fields) |
 
-Full interactive docs at `/api/docs`.
+### Analytics
+
+All analytics endpoints accept the same query parameters: `versionMode` (`combined` / `specific`), `versionId`, `startDate`, `endDate`, `status`, `respondentIds`, `answerFilters`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/surveys/:id/analytics` | Full analytics — all sections in one response |
+| `GET` | `/surveys/:id/analytics/summary` | Totals, completion rate, avg / median time |
+| `GET` | `/surveys/:id/analytics/funnel` | Started → in-progress → completed → abandoned counts |
+| `GET` | `/surveys/:id/analytics/trends` | Daily and weekly response counts |
+| `GET` | `/surveys/:id/analytics/questions` | Per-question breakdowns (choice distributions, averages, word frequency) |
+| `GET` | `/surveys/:id/analytics/questions/:questionId/responses` | Raw text responses for a single question |
+| `GET` | `/surveys/:id/analytics/export` | Download responses as CSV |
+
+### Health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Liveness check |
+| `GET` | `/health/ready` | Readiness check (includes DB connectivity) |
 
 ---
 
