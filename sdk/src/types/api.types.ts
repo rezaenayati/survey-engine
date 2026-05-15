@@ -171,3 +171,95 @@ export interface ResponseValidationResult {
   hiddenQuestions: string[];
   requiredQuestions: string[];
 }
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+export interface AnalyticsSummary {
+  totalResponses: number;
+  completedResponses: number;
+  completionRate: number;
+  avgCompletionTime: number;
+  medianCompletionTime: number;
+  responsesByStatus: Record<string, number>;
+  responsesToday: number;
+  responsesThisWeek: number;
+  versionsIncluded?: number[];
+}
+
+export interface AnalyticsFunnel {
+  total: number;
+  started: number;
+  inProgress: number;
+  completed: number;
+  abandoned: number;
+  activeResponses: number;
+  staleResponses: number;
+  completionRate: number;
+  dropOffRate: number;
+  abandonmentRate: number;
+}
+
+export interface TrendDataPoint {
+  date: string;
+  count: number;
+  completed: number;
+}
+
+export interface AnalyticsTrends {
+  daily: TrendDataPoint[];
+  weekly: TrendDataPoint[];
+}
+
+export interface ChoiceDistribution {
+  value: string;
+  label: string;
+  count: number;
+  percentage: number;
+  isLegacy?: boolean;
+  fromVersions?: number[];
+}
+
+export interface WordFrequency {
+  word: string;
+  count: number;
+}
+
+export interface QuestionAnalytics {
+  questionId: string;
+  questionType: string;
+  questionTitle: string;
+  totalAnswers: number;
+  skipped: number;
+  distribution?: ChoiceDistribution[];
+  average?: number;
+  median?: number;
+  stdDeviation?: number;
+  min?: number;
+  max?: number;
+  valueDistribution?: Record<string, number>;
+  wordFrequency?: WordFrequency[];
+  avgTextLength?: number;
+  sampleSize?: number;
+  recentResponses?: string[];
+  trueCount?: number;
+  falseCount?: number;
+  isLegacy?: boolean;
+  fromVersions?: number[];
+}
+
+export interface SurveyAnalytics {
+  surveyId: string;
+  surveyName: string;
+  summary: AnalyticsSummary;
+  funnel: AnalyticsFunnel;
+  trends: AnalyticsTrends;
+  questions: QuestionAnalytics[];
+  generatedAt: string;
+  appliedFilters?: {
+    dateRange?: { startDate?: string; endDate?: string };
+    versionMode?: string;
+    versionId?: string;
+    respondentIdsCount?: number;
+    status?: string;
+  };
+}

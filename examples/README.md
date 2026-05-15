@@ -1,38 +1,31 @@
 # Examples
 
-Two runnable examples showing end-to-end integration with survey-engine.
+## nextjs
 
-## express-backend
+A full-stack Next.js 15 application covering every survey-engine feature:
+survey list, taking surveys (SurveyJS), auto-save, admin dashboard, schema editor with live preview, publish flow, analytics dashboard, and webhook configuration.
 
-A Node.js / Express service that delegates all survey logic to survey-engine.  
-Shows the **backend-to-backend** integration pattern: your service authenticates users and forwards their ID to survey-engine via `X-User-ID`.
+→ [examples/nextjs/README.md](./nextjs/README.md)
 
-→ [examples/express-backend/README.md](./express-backend/README.md)
+---
 
-## react-frontend
+## basic
 
-A React + SurveyJS app that renders surveys and collects responses.  
-Designed to sit in front of `express-backend`, but can also call survey-engine directly for internal tools or prototypes.
+A minimal static HTML page with a sample SurveyJS schema — useful for understanding the raw JSON format without any build tooling.
 
-→ [examples/react-frontend/README.md](./react-frontend/README.md)
+→ [examples/basic/README.md](./basic/README.md)
 
 ---
 
 ## Running the full stack
 
 ```bash
-# 1. survey-engine + PostgreSQL
-docker-compose up -d
+# 1. Start survey-engine + PostgreSQL (from the project root)
+docker compose up -d
 
-# 2. Seed a demo survey (once)
-cd examples/express-backend
-npm install && npm run seed      # → prints SURVEY_ID
-
-# 3. Backend service
-npm start                        # http://localhost:4000
-
-# 4. React frontend (new terminal)
-cd ../react-frontend
+# 2. Run the Next.js example
+cd examples/nextjs
+cp .env.local.example .env.local
 npm install
-VITE_SURVEY_ID=<paste-id> npm run dev   # http://localhost:5173
+PORT=4000 npm run dev       # → http://localhost:4000
 ```

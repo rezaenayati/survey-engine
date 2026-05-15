@@ -1,6 +1,7 @@
 import type {
   Survey,
   SurveyVersion,
+  SurveyAnalytics,
   SurveyResponse,
   PaginatedResult,
   CreateSurveyInput,
@@ -174,7 +175,7 @@ class SurveysClient extends BaseClient {
     return this.request('POST', `/surveys/${id}/evaluate-logic`, { answers });
   }
 
-  getAnalytics(id: string, query?: AnalyticsQuery): Promise<unknown> {
+  getAnalytics(id: string, query?: AnalyticsQuery): Promise<SurveyAnalytics> {
     return this.request('GET', `/surveys/${id}/analytics`, undefined, query as never);
   }
 }

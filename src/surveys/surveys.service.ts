@@ -92,7 +92,12 @@ export class SurveysService {
       sortOrder = 'DESC',
     } = query;
 
-    const where = ctx.userId ? { createdBy: ctx.userId } : { createdBy: '' };
+    // Authenticated users see their own surveys (all statuses).
+    // Unauthenticated/anonymous callers see only published surveys across all owners
+    // — this powers the public survey-list page without requiring ownership.
+    const where = ctx.userId
+      ? { createdBy: ctx.userId }
+      : { status: SurveyStatus.PUBLISHED };
 
     const [data, total] = await this.surveyRepository.findAndCount({
       where,
