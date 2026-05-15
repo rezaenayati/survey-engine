@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/survey-engine.git",
+    "url": "https://github.com/rezaenayati/survey-engine.git",
     "directory": "sdk"
   },
   "devDependencies": {

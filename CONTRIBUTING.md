@@ -16,7 +16,7 @@ Thank you for your interest in contributing. This document explains how to set u
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-org/survey-engine.git
+git clone https://github.com/rezaenayati/survey-engine.git
 cd survey-engine
 
 # Install dependencies

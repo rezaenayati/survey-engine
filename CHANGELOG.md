@@ -50,4 +50,4 @@ Initial public release.
 
 ---
 
-> For unreleased changes, see the [commit history](https://github.com/your-org/survey-engine/commits/main).
+> For unreleased changes, see the [commit history](https://github.com/rezaenayati/survey-engine/commits/main).

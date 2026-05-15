@@ -1,6 +1,6 @@
 # @survey-engine/sdk
 
-TypeScript SDK for the [Survey Engine](https://github.com/your-org/survey-engine) API.
+TypeScript SDK for the [Survey Engine](https://github.com/rezaenayati/survey-engine) API.
 
 Provides a typed HTTP client and shared TypeScript types for survey schemas, logic rules, and API responses.
 

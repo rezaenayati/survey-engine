@@ -12,7 +12,7 @@
 
 If you discover a vulnerability, send a private report to the maintainers:
 
-1. Open a [GitHub Security Advisory](https://github.com/your-org/survey-engine/security/advisories/new) (preferred — kept private until resolved).
+1. Open a [GitHub Security Advisory](https://github.com/rezaenayati/survey-engine/security/advisories/new) (preferred — kept private until resolved).
 2. Or email the maintainers directly. The address is listed in the repository's `package.json` `author` field.
 
 Include as much of the following as possible:

@@ -7,7 +7,7 @@
 ## Quick start with Docker Compose
 
 ```bash
-git clone https://github.com/your-org/survey-engine.git
+git clone https://github.com/rezaenayati/survey-engine.git
 cd survey-engine
 cp .env.example .env          # Edit as needed
 docker-compose up -d
