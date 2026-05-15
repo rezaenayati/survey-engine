@@ -7,7 +7,7 @@ import type {
   UpdateSurveyInput,
   StartResponseInput,
   UpdateResponseInput,
-  PaginationQuery,
+  ListSurveysQuery,
   ListResponsesQuery,
   AnalyticsQuery,
   LogicEvaluationResult,
@@ -133,7 +133,7 @@ class SurveysClient extends BaseClient {
     return this.request('POST', '/surveys', input);
   }
 
-  list(query?: PaginationQuery): Promise<PaginatedResult<Survey>> {
+  list(query?: ListSurveysQuery): Promise<PaginatedResult<Survey>> {
     return this.request('GET', '/surveys', undefined, query as never);
   }
 

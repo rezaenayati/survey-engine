@@ -12,11 +12,8 @@ import { SurveysService } from '../surveys/surveys.service';
 import { ResponseStatus } from '../common/constants/status.constants';
 import { RequestContext } from '../common/interfaces/request-context.interface';
 import { WebhookService } from '../webhooks/webhook.service';
-import {
-  PaginationQueryDto,
-  PaginatedResponseDto,
-} from '../common/dto/pagination.dto';
-import { StartResponseDto, UpdateResponseDto } from './dto';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
+import { StartResponseDto, UpdateResponseDto, ListResponsesQueryDto } from './dto';
 import {
   ResponseValidatorService,
   LogicEngineService,
@@ -78,7 +75,7 @@ export class ResponsesService {
 
   async findAll(
     ctx: RequestContext,
-    query: PaginationQueryDto & { surveyId?: string; status?: ResponseStatus },
+    query: ListResponsesQueryDto,
   ): Promise<PaginatedResponseDto<Response>> {
     const {
       page = 1,

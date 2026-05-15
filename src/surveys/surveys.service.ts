@@ -10,10 +10,8 @@ import { Survey } from './entities/survey.entity';
 import { CreateSurveyDto, UpdateSurveyDto } from './dto';
 import { SurveyStatus } from '../common/constants/status.constants';
 import { RequestContext } from '../common/interfaces/request-context.interface';
-import {
-  PaginationQueryDto,
-  PaginatedResponseDto,
-} from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
+import { ListSurveysQueryDto } from './dto/list-surveys-query.dto';
 import {
   SchemaValidatorService,
   LogicEngineService,
@@ -85,7 +83,7 @@ export class SurveysService {
 
   async findAll(
     ctx: RequestContext,
-    query: PaginationQueryDto,
+    query: ListSurveysQueryDto,
   ): Promise<PaginatedResponseDto<Survey>> {
     const {
       page = 1,

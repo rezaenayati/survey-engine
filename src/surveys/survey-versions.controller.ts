@@ -14,7 +14,13 @@ import {
   ApiSecurity,
 } from '@nestjs/swagger';
 import { SurveyVersionsService } from './survey-versions.service';
-import { SurveyDto, SurveyVersionDto, EvaluateLogicDto } from './dto';
+import {
+  SurveyDto,
+  SurveyVersionDto,
+  EvaluateLogicDto,
+  SurveyValidationResultDto,
+  LogicEvaluationResultDto,
+} from './dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
 
@@ -79,40 +85,26 @@ export class SurveyVersionsController {
   @Get(':id/validate')
   @ApiOperation({ summary: 'Validate the draft schema and logic rules without publishing' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Validation result' })
+  @ApiResponse({ status: 200, description: 'Validation result', type: SurveyValidationResultDto })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async validateSurvey(
     @GetContext() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{
-    schemaValid: boolean;
-    logicValid: boolean;
-    schemaErrors: unknown[];
-    schemaWarnings: unknown[];
-    logicErrors: string[];
-  }> {
+  ): Promise<SurveyValidationResultDto> {
     return this.surveyVersionsService.validateSurvey(ctx, id);
   }
 
   @Post(':id/evaluate-logic')
   @ApiOperation({ summary: 'Evaluate logic rules for the given answers' })
   @ApiParam({ name: 'id', description: 'Survey ID' })
-  @ApiResponse({ status: 200, description: 'Logic evaluation result' })
+  @ApiResponse({ status: 200, description: 'Logic evaluation result', type: LogicEvaluationResultDto })
   @ApiResponse({ status: 400, description: 'No published version' })
   @ApiResponse({ status: 404, description: 'Survey not found' })
   async evaluateLogic(
     @GetContext() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: EvaluateLogicDto,
-  ): Promise<{
-    visibleQuestions: string[];
-    hiddenQuestions: string[];
-    visiblePages: string[];
-    hiddenPages: string[];
-    requiredQuestions: string[];
-    calculatedValues: Record<string, unknown>;
-    validationErrors: Record<string, string>;
-  }> {
+  ): Promise<LogicEvaluationResultDto> {
     return this.surveyVersionsService.evaluateLogic(ctx, id, dto.answers);
   }
 }

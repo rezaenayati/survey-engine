@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -39,7 +40,7 @@ describe('Responses API (e2e)', () => {
           username: db.username,
           password: db.password,
           database: db.database,
-          entities: [__dirname + '/../src/**/*.entity{.ts,.js}'],
+          entities: [path.join(process.cwd(), 'src/**/*.entity{.ts,.js}')],
           synchronize: true,
           logging: false,
         }),

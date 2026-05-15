@@ -17,18 +17,14 @@ import {
   ApiResponse,
   ApiParam,
   ApiSecurity,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { ResponsesService } from './responses.service';
-import { StartResponseDto, UpdateResponseDto } from './dto';
+import { StartResponseDto, UpdateResponseDto, ListResponsesQueryDto, ResponseValidationResultDto } from './dto';
+import { LogicEvaluationResultDto } from '../surveys/dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
-import {
-  PaginationQueryDto,
-  PaginatedResponseDto,
-} from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 import { Response } from './entities/response.entity';
-import { ResponseStatus } from '../common/constants/status.constants';
 
 @ApiTags('responses')
 @ApiSecurity('user-id')
@@ -48,22 +44,10 @@ export class ResponsesController {
 
   @Get()
   @ApiOperation({ summary: 'List all responses for tenant' })
-  @ApiQuery({
-    name: 'surveyId',
-    required: false,
-    description: 'Filter by survey ID',
-  })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ResponseStatus,
-    description: 'Filter by status',
-  })
   @ApiResponse({ status: 200, description: 'List of responses' })
   async findAll(
     @GetContext() ctx: RequestContext,
-    @Query()
-    query: PaginationQueryDto & { surveyId?: string; status?: ResponseStatus },
+    @Query() query: ListResponsesQueryDto,
   ): Promise<PaginatedResponseDto<Response>> {
     return this.responsesService.findAll(ctx, query);
   }
@@ -123,38 +107,24 @@ export class ResponsesController {
   @Get(':id/validate')
   @ApiOperation({ summary: 'Validate a response without completing it' })
   @ApiParam({ name: 'id', description: 'Response ID' })
-  @ApiResponse({ status: 200, description: 'Validation result' })
+  @ApiResponse({ status: 200, description: 'Validation result', type: ResponseValidationResultDto })
   @ApiResponse({ status: 404, description: 'Response not found' })
   async validate(
     @GetContext() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{
-    valid: boolean;
-    errors: unknown[];
-    missingRequired: string[];
-    visibleQuestions: string[];
-    hiddenQuestions: string[];
-    requiredQuestions: string[];
-  }> {
+  ): Promise<ResponseValidationResultDto> {
     return this.responsesService.validate(ctx, id);
   }
 
   @Get(':id/logic')
   @ApiOperation({ summary: 'Evaluate logic rules for current response state' })
   @ApiParam({ name: 'id', description: 'Response ID' })
-  @ApiResponse({ status: 200, description: 'Logic evaluation result' })
+  @ApiResponse({ status: 200, description: 'Logic evaluation result', type: LogicEvaluationResultDto })
   @ApiResponse({ status: 404, description: 'Response not found' })
   async evaluateLogic(
     @GetContext() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{
-    visibleQuestions: string[];
-    hiddenQuestions: string[];
-    visiblePages: string[];
-    hiddenPages: string[];
-    requiredQuestions: string[];
-    calculatedValues: Record<string, unknown>;
-  }> {
+  ): Promise<LogicEvaluationResultDto> {
     return this.responsesService.evaluateLogic(ctx, id);
   }
 }

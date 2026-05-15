@@ -123,11 +123,15 @@ export interface UpdateResponseInput {
 export interface PaginationQuery {
   page?: number;
   limit?: number;
-  sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
 }
 
+export interface ListSurveysQuery extends PaginationQuery {
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'status';
+}
+
 export interface ListResponsesQuery extends PaginationQuery {
+  sortBy?: 'startedAt' | 'updatedAt' | 'completedAt';
   surveyId?: string;
   status?: ResponseStatus;
 }

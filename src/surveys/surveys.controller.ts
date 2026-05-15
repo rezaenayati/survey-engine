@@ -19,14 +19,11 @@ import {
   ApiSecurity,
 } from '@nestjs/swagger';
 import { SurveysService } from './surveys.service';
-import { CreateSurveyDto, UpdateSurveyDto } from './dto';
+import { CreateSurveyDto, UpdateSurveyDto, ListSurveysQueryDto } from './dto';
 import { SurveyDto } from './dto/survey.dto';
 import { GetContext } from '../common/decorators/request-context.decorator';
 import type { RequestContext } from '../common/interfaces/request-context.interface';
-import {
-  PaginationQueryDto,
-  PaginatedResponseDto,
-} from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
 @ApiTags('surveys')
 @ApiSecurity('user-id')
@@ -49,7 +46,7 @@ export class SurveysController {
   @ApiResponse({ status: 200, description: 'List of surveys' })
   async findAll(
     @GetContext() ctx: RequestContext,
-    @Query() query: PaginationQueryDto,
+    @Query() query: ListSurveysQueryDto,
   ): Promise<PaginatedResponseDto<SurveyDto>> {
     return this.surveysService.findAll(ctx, query);
   }
