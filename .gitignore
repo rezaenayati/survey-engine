@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Environment — never commit secrets
+.env
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Test coverage
+coverage
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Editor / IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+logs/
