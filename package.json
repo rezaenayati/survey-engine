@@ -25,7 +25,7 @@
     "migration:show": "npm run typeorm migration:show",
     "sdk:build": "npm run build --prefix sdk",
     "sdk:publish": "npm run build --prefix sdk && npm publish --prefix sdk",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "src/**/*.ts": [
