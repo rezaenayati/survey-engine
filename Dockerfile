@@ -3,6 +3,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# HUSKY=0 makes the package.json `prepare` script (which runs `husky`) a no-op,
+# since husky is a devDependency that may not be installed in CI/Docker layers.
+ENV HUSKY=0
+
 COPY package*.json ./
 RUN npm ci
 
@@ -13,6 +17,8 @@ RUN npm run build
 FROM node:20-alpine AS production
 
 WORKDIR /app
+
+ENV HUSKY=0
 
 COPY package*.json ./
 RUN npm ci --only=production
