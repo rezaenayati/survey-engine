@@ -84,6 +84,26 @@ export class SurveysController {
         return this.surveysService.update(ctx, id, dto);
     }
 
+    @Post(':id/duplicate')
+    @ApiOperation({
+        summary: 'Duplicate a survey',
+        description:
+            'Creates a new draft copy of the survey. The copy has the same schema, logic, and settings but a fresh ID and "(copy)" appended to the name.',
+    })
+    @ApiParam({ name: 'id', description: 'Survey ID to duplicate' })
+    @ApiResponse({
+        status: 201,
+        description: 'Duplicated survey (new draft)',
+        type: SurveyDto,
+    })
+    @ApiResponse({ status: 404, description: 'Survey not found' })
+    async duplicate(
+        @GetContext() ctx: RequestContext,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<SurveyDto> {
+        return this.surveysService.duplicate(ctx, id);
+    }
+
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Delete a survey' })

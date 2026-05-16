@@ -34,6 +34,9 @@ export interface SurveyEngineClientOptions {
 }
 
 export class SurveyEngineError extends Error {
+  /** Stable machine-readable error code from the API (e.g. "SURVEY_NOT_FOUND") */
+  readonly code: string;
+
   constructor(
     public readonly status: number,
     public readonly body: unknown,
@@ -41,6 +44,8 @@ export class SurveyEngineError extends Error {
   ) {
     super(message);
     this.name = 'SurveyEngineError';
+    const b = body as Record<string, unknown> | null;
+    this.code = (b && typeof b.code === 'string' ? b.code : null) ?? 'UNKNOWN';
   }
 }
 
@@ -154,6 +159,11 @@ class SurveysClient extends BaseClient {
     return this.request('POST', `/surveys/${id}/publish`);
   }
 
+  /** Duplicate a survey into a new draft — the copy gets "(copy)" appended to its name */
+  duplicate(id: string): Promise<Survey> {
+    return this.request('POST', `/surveys/${id}/duplicate`);
+  }
+
   listVersions(id: string): Promise<SurveyVersion[]> {
     return this.request('GET', `/surveys/${id}/versions`);
   }
@@ -183,8 +193,9 @@ class SurveysClient extends BaseClient {
 // ─── Responses client ─────────────────────────────────────────────────────────
 
 class ResponsesClient extends BaseClient {
+  /** Start a new response session (canonical route) */
   start(input: StartResponseInput): Promise<SurveyResponse> {
-    return this.request('POST', '/responses/start', input);
+    return this.request('POST', '/responses', input);
   }
 
   list(query?: ListResponsesQuery): Promise<PaginatedResult<SurveyResponse>> {

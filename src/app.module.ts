@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -9,6 +9,7 @@ import { SurveysModule } from './surveys/surveys.module';
 import { ResponsesModule } from './responses/responses.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
 @Module({
     imports: [
@@ -84,4 +85,8 @@ import { HealthModule } from './health/health.module';
         { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+    configure(consumer: MiddlewareConsumer): void {
+        consumer.apply(RequestIdMiddleware).forRoutes('*');
+    }
+}

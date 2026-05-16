@@ -10,6 +10,7 @@ import {
     HttpCode,
     HttpStatus,
     ParseUUIDPipe,
+    Header,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -37,10 +38,33 @@ import { Response } from './entities/response.entity';
 export class ResponsesController {
     constructor(private readonly responsesService: ResponsesService) {}
 
-    @Post('start')
+    @Post()
     @ApiOperation({ summary: 'Start a new response session' })
     @ApiResponse({ status: 201, description: 'Response started' })
     async start(
+        @GetContext() ctx: RequestContext,
+        @Body() dto: StartResponseDto,
+    ): Promise<Response> {
+        return this.responsesService.start(ctx, dto);
+    }
+
+    /**
+     * @deprecated Use POST /responses instead.
+     * Kept for backwards compatibility — will be removed in a future major release.
+     */
+    @Post('start')
+    @Header('Deprecation', 'true')
+    @Header('Link', '</responses>; rel="successor-version"')
+    @Header('Sunset', 'Sat, 1 Jan 2026 00:00:00 GMT')
+    @ApiOperation({
+        summary: '[Deprecated] Start a new response session',
+        description:
+            '**Deprecated** — use `POST /responses` instead. ' +
+            'This route will be removed in a future major release.',
+        deprecated: true,
+    })
+    @ApiResponse({ status: 201, description: 'Response started' })
+    async startDeprecated(
         @GetContext() ctx: RequestContext,
         @Body() dto: StartResponseDto,
     ): Promise<Response> {

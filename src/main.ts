@@ -5,6 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -31,6 +32,9 @@ async function bootstrap() {
             'X-API-Key',
         ],
     });
+
+    // Global exception filter — adds stable `code` field to every error response
+    app.useGlobalFilters(new HttpExceptionFilter());
 
     // Global validation
     app.useGlobalPipes(

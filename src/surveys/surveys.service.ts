@@ -189,6 +189,31 @@ export class SurveysService {
         return this.surveyRepository.save(survey);
     }
 
+    async duplicate(ctx: RequestContext, id: string): Promise<Survey> {
+        const original = await this.findOne(ctx, id);
+        this.assertOwner(original, ctx);
+
+        const copy = this.surveyRepository.create({
+            createdBy: ctx.userId || null,
+            name: `${original.name} (copy)`,
+            description: original.description,
+            draftSchemaJson: original.draftSchemaJson
+                ? (JSON.parse(
+                      JSON.stringify(original.draftSchemaJson),
+                  ) as Record<string, unknown>)
+                : null,
+            draftLogicJson: original.draftLogicJson
+                ? (JSON.parse(
+                      JSON.stringify(original.draftLogicJson),
+                  ) as Record<string, unknown>)
+                : null,
+            settings: { ...original.settings },
+            status: SurveyStatus.DRAFT,
+        });
+
+        return this.surveyRepository.save(copy);
+    }
+
     async remove(ctx: RequestContext, id: string): Promise<void> {
         const survey = await this.findOne(ctx, id);
         this.assertOwner(survey, ctx);
