@@ -172,7 +172,7 @@ await surveyEngine.responses.update(response.id, { answersJson: { score: 8 } });
 await surveyEngine.responses.complete(response.id);
 ```
 
-See [`examples/`](examples/) for a full Next.js walkthrough.
+See [`examples/nextjs/README.md`](examples/nextjs/README.md) for a full Next.js walkthrough.
 
 ---
 
@@ -207,7 +207,7 @@ Requests without `X-User-ID` are accepted as anonymous.
 5. Submit:         POST  /responses/:id/complete
 ```
 
-See [`examples/`](examples/) for a working Next.js integration.
+See [`examples/nextjs/README.md`](examples/nextjs/README.md) for a working Next.js integration.
 
 ### File Questions
 
