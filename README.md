@@ -1,7 +1,8 @@
 # Survey Engine
 
 [![CI](https://github.com/rezaenayati/survey-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/rezaenayati/survey-engine/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)](https://github.com/rezaenayati/survey-engine/actions)
+[![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen)](https://github.com/rezaenayati/survey-engine/actions)
+[![npm](https://img.shields.io/npm/v/survey-engine-sdk?label=sdk&color=cb3837&logo=npm)](https://www.npmjs.com/package/survey-engine-sdk)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)

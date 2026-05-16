@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- `POST /surveys/:id/duplicate` — clone a survey into a new draft with `(copy)` appended to the name
+- `POST /responses` as the canonical route for starting a response (`POST /responses/start` kept with `Deprecation` headers)
+- Structured error codes in all API error responses — every error body now includes a stable `code` field (e.g. `SURVEY_NOT_FOUND`, `RESPONSE_ALREADY_COMPLETED`)
+- `X-Request-ID` response header — echoes the inbound `X-Correlation-ID` or generates a UUID if absent
+- Expression evaluation for `CALCULATED` logic rules — supports arithmetic, `{questionId}` references, and built-in functions (`ROUND`, `FLOOR`, `CEIL`, `ABS`, `MIN`, `MAX`, `SUM`, `CONCAT`, `IF`)
+- `SurveyEngineError.code` property in the SDK — reads the stable error code from API error responses
+- `client.surveys.duplicate(id)` in the SDK
+
+### Changed
+- `survey-engine-sdk` published to npm — `npm install survey-engine-sdk`
+- Pre-commit hooks (husky + lint-staged): runs Prettier + ESLint on staged files and `tsc --noEmit` on every commit
+- Prettier tab width changed to 4 spaces; `.vscode/settings.json` added for consistent editor config
+
+---
+
 ## [1.0.0] — 2026-05-15
 
 Initial public release.
