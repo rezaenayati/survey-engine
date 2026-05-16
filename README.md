@@ -141,13 +141,13 @@ npm run start:dev
 ### 2. Install the SDK in your project
 
 ```bash
-npm install @survey-engine/sdk
+npm install survey-engine-sdk
 ```
 
 ### 3. Call it from your backend
 
 ```typescript
-import { SurveyEngineClient } from '@survey-engine/sdk';
+import { SurveyEngineClient } from 'survey-engine-sdk';
 
 const surveyEngine = new SurveyEngineClient({
   baseUrl: 'http://your-survey-engine-host:3000',

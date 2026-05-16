@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError } from '@survey-engine/sdk';
+import { SurveyEngineError } from 'survey-engine-sdk';
 
 const SURVEY_ENGINE_URL = process.env.SURVEY_ENGINE_URL ?? 'http://localhost:3000';
 

@@ -41,7 +41,7 @@ Initial public release.
 
 **Developer experience**
 - OpenAPI / Swagger docs at `/api/docs`
-- `@survey-engine/sdk` — TypeScript client with full type coverage
+- `survey-engine-sdk` — TypeScript client with full type coverage
 - 259 unit tests (jest) and integration tests (testcontainers/PostgreSQL)
 - GitHub Actions CI: lint, build, unit tests with coverage, integration tests
 - Docker Compose for local development

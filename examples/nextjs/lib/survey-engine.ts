@@ -1,4 +1,4 @@
-import { SurveyEngineClient } from '@survey-engine/sdk';
+import { SurveyEngineClient } from 'survey-engine-sdk';
 
 const SURVEY_ENGINE_URL = process.env.SURVEY_ENGINE_URL ?? 'http://localhost:3000';
 const API_KEY = process.env.SURVEY_ENGINE_API_KEY;

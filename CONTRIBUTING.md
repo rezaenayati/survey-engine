@@ -73,7 +73,7 @@ src/
 ├── webhooks/              Webhook delivery with HMAC signing and retry logic
 └── health/                Liveness + readiness endpoints
 
-sdk/                       npm package (@survey-engine/sdk)
+sdk/                       npm package (survey-engine-sdk)
 docs/                      In-depth documentation
 examples/nextjs/           Full-stack Next.js example (SurveyJS Creator + survey-taking + analytics)
 test/

@@ -1,4 +1,4 @@
-# @survey-engine/sdk
+# survey-engine-sdk
 
 TypeScript SDK for the [Survey Engine](https://github.com/rezaenayati/survey-engine) API.
 
@@ -7,13 +7,13 @@ Provides a typed HTTP client and shared TypeScript types for survey schemas, log
 ## Install
 
 ```bash
-npm install @survey-engine/sdk
+npm install survey-engine-sdk
 ```
 
 ## Usage
 
 ```typescript
-import { SurveyEngineClient } from '@survey-engine/sdk';
+import { SurveyEngineClient } from 'survey-engine-sdk';
 
 const client = new SurveyEngineClient({
   baseUrl: 'http://survey-engine:3000',
@@ -143,13 +143,13 @@ import type {
   CreateSurveyInput,
   SurveyAnalytics,
   // ... etc.
-} from '@survey-engine/sdk';
+} from 'survey-engine-sdk';
 ```
 
 ## Error handling
 
 ```typescript
-import { SurveyEngineClient, SurveyEngineError } from '@survey-engine/sdk';
+import { SurveyEngineClient, SurveyEngineError } from 'survey-engine-sdk';
 
 try {
   await client.surveys.get('non-existent-id');

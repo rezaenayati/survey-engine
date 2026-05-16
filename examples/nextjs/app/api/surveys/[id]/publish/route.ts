@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError } from '@survey-engine/sdk';
+import { SurveyEngineError } from 'survey-engine-sdk';
 
 type Params = { params: Promise<{ id: string }> };
 
