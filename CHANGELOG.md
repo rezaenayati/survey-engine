@@ -9,19 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- `POST /surveys/:id/duplicate` — clone a survey into a new draft with `(copy)` appended to the name
-- `POST /responses` as the canonical route for starting a response (`POST /responses/start` kept with `Deprecation` headers)
-- Structured error codes in all API error responses — every error body now includes a stable `code` field (e.g. `SURVEY_NOT_FOUND`, `RESPONSE_ALREADY_COMPLETED`)
-- `X-Request-ID` response header — echoes the inbound `X-Correlation-ID` or generates a UUID if absent
-- Expression evaluation for `CALCULATED` logic rules — supports arithmetic, `{questionId}` references, and built-in functions (`ROUND`, `FLOOR`, `CEIL`, `ABS`, `MIN`, `MAX`, `SUM`, `CONCAT`, `IF`)
-- `SurveyEngineError.code` property in the SDK — reads the stable error code from API error responses
-- `client.surveys.duplicate(id)` in the SDK
+### API
 
-### Changed
-- `survey-engine-sdk` published to npm — `npm install survey-engine-sdk`
-- Pre-commit hooks (husky + lint-staged): runs Prettier + ESLint on staged files and `tsc --noEmit` on every commit
-- Prettier tab width changed to 4 spaces; `.vscode/settings.json` added for consistent editor config
+- **`POST /surveys/:id/duplicate`** — clone any survey into a fresh draft. The copy gets `(copy)` appended
+  to its name and starts with no versions or responses. Ownership rules apply.
+- **`POST /responses`** is now the canonical route for starting a response session.
+  `POST /responses/start` is kept for backwards compatibility and responds with
+  `Deprecation: true`, `Link: </responses>; rel="successor-version"`, and `Sunset` headers.
+- **Structured error codes** — every API error body now includes a stable `code` string alongside
+  `statusCode` and `message`. Codes are machine-readable and safe to branch on without parsing
+  the message text. Examples: `SURVEY_NOT_FOUND`, `RESPONSE_ALREADY_COMPLETED`, `FORBIDDEN`,
+  `INVALID_SCHEMA`, `RATE_LIMITED`.
+- **`X-Request-ID` response header** — every response now carries a traceable request ID.
+  The value is the inbound `X-Correlation-ID` when present, or a freshly generated UUID otherwise.
+
+### Logic engine
+
+- **`CALCULATED` rule expression evaluation** — calculated field rules now evaluate their
+  `expression` string instead of storing it raw. Supported syntax:
+  - `{questionId}` substitution from current answers
+  - Arithmetic: `+`, `-`, `*`, `/`, `%`, `**` with correct precedence and parentheses
+  - String concatenation when either operand is a string
+  - Built-in functions: `ROUND(x, d?)`, `FLOOR`, `CEIL`, `ABS`, `MIN`, `MAX`, `SUM`, `CONCAT`, `IF`
+  - Returns `null` on any parse or evaluation error (never throws)
+
+### SDK
+
+- **`survey-engine-sdk` published to npm** — `npm install survey-engine-sdk`
+  ([npmjs.com/package/survey-engine-sdk](https://www.npmjs.com/package/survey-engine-sdk))
+- **`client.surveys.duplicate(id)`** — mirrors the new duplicate endpoint
+- **`SurveyEngineError.code`** — the `SurveyEngineError` class now exposes a `.code` property
+  that reads the stable error code from the API response body
+- **`ListSurveysQuery.sortBy`** narrowed to `'createdAt' | 'updatedAt' | 'name' | 'status'`
+- **`ListResponsesQuery.sortBy`** narrowed to `'startedAt' | 'updatedAt' | 'completedAt'`
+- **`client.responses.start()`** now calls `POST /responses` (the new canonical route)
+
+### Tests
+
+- 288 unit tests (up from 259) — added coverage for `duplicate`, expression evaluator
+  (arithmetic, built-in functions, error handling), and `CALCULATED` rule integration
+
+### Developer experience
+
+- **Pre-commit hooks** (husky + lint-staged) — Prettier + ESLint run on staged `src/` and
+  `test/` files; `tsc --noEmit` runs on the full project before every commit
+- **4-space indentation** — Prettier `tabWidth` updated to 4; `.vscode/settings.json` added
+  so Cursor/VSCode uses the same setting without manual configuration
+- **`package.json`** — added `repository`, `homepage`, and `bugs` fields pointing to the
+  GitHub repository
 
 ---
 
