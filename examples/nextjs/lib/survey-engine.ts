@@ -1,6 +1,7 @@
 import { SurveyEngineClient } from 'survey-engine-sdk';
 
-const SURVEY_ENGINE_URL = process.env.SURVEY_ENGINE_URL ?? 'http://localhost:3000';
+const SURVEY_ENGINE_URL =
+    process.env.SURVEY_ENGINE_URL ?? 'http://localhost:3000';
 const API_KEY = process.env.SURVEY_ENGINE_API_KEY;
 
 /**
@@ -11,14 +12,21 @@ const API_KEY = process.env.SURVEY_ENGINE_API_KEY;
  * forwarded by the Next.js API route from the browser cookie.
  */
 export function createClient(userId = 'admin') {
-  return new SurveyEngineClient({
-    baseUrl: SURVEY_ENGINE_URL,
-    userId,
-    ...(API_KEY ? { apiKey: API_KEY } : {}),
-  });
+    return new SurveyEngineClient({
+        baseUrl: SURVEY_ENGINE_URL,
+        userId,
+        ...(API_KEY ? { apiKey: API_KEY } : {}),
+    });
 }
+
+/** Public origin for file download/preview URLs (browser and server). Prefer `NEXT_PUBLIC_SURVEY_ENGINE_URL` in `.env.local` so the client bundle can see it. */
+export const publicSurveyEngineUrl = (
+    process.env.NEXT_PUBLIC_SURVEY_ENGINE_URL ??
+    process.env.SURVEY_ENGINE_URL ??
+    'http://localhost:3000'
+).replace(/\/$/, '');
 
 /** Read the demo user ID from an incoming API request. */
 export function getUserIdFromRequest(request: Request): string {
-  return request.headers.get('x-demo-user') ?? 'admin';
+    return request.headers.get('x-demo-user') ?? 'admin';
 }

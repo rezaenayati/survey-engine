@@ -5,14 +5,17 @@ import { SurveyEngineError } from 'survey-engine-sdk';
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
-  try {
-    const { id } = await params;
-    const client = createClient(getUserIdFromRequest(request));
-    return Response.json(await client.responses.complete(id));
-  } catch (err) {
-    if (err instanceof SurveyEngineError) {
-      return Response.json(err.body, { status: err.status });
+    try {
+        const { id } = await params;
+        const client = createClient(getUserIdFromRequest(request));
+        return Response.json(await client.responses.complete(id));
+    } catch (err) {
+        if (err instanceof SurveyEngineError) {
+            return Response.json(err.body, { status: err.status });
+        }
+        return Response.json(
+            { message: 'Internal server error' },
+            { status: 500 },
+        );
     }
-    return Response.json({ message: 'Internal server error' }, { status: 500 });
-  }
 }

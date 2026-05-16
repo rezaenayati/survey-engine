@@ -27,6 +27,10 @@ export interface SurveyEngineClientOptions {
      */
     userId?: string;
     /**
+     * Optional global API key when the server has API_KEY set — sent as X-API-Key.
+     */
+    apiKey?: string;
+    /**
      * Optional correlation ID forwarded as X-Correlation-ID header.
      * Useful for distributed tracing.
      */
@@ -126,6 +130,9 @@ class BaseClient {
 
         if (this.options.userId) {
             headers['X-User-ID'] = this.options.userId;
+        }
+        if (this.options.apiKey) {
+            headers['X-API-Key'] = this.options.apiKey;
         }
         if (this.options.correlationId) {
             headers['X-Correlation-ID'] = this.options.correlationId;
