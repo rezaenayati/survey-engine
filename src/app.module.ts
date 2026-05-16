@@ -10,6 +10,7 @@ import { ResponsesModule } from './responses/responses.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { FilesModule } from './files/files.module';
 
 @Module({
     imports: [
@@ -76,6 +77,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 
         SurveysModule,
         ResponsesModule,
+        FilesModule,
         AnalyticsModule,
         HealthModule,
     ],

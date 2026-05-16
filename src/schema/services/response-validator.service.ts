@@ -47,6 +47,8 @@ interface NormalizedQuestion {
     maxLength?: number;
     min?: number;
     max?: number;
+    allowedFileTypes?: string[];
+    maxFileSize?: number;
 }
 
 /**
@@ -186,7 +188,7 @@ export class ResponseValidatorService {
                 break;
 
             case 'file':
-                // File answers are typically arrays of file info
+                this.validateFileAnswer(question, answer, basePath, errors);
                 break;
 
             case 'signaturepad':
@@ -374,6 +376,126 @@ export class ResponseValidatorService {
     }
 
     /**
+     * File answers should reference files uploaded through the Files API.
+     * Expected shape: `{ fileId, originalName?, mimeType?, size?, url? }` or an array of that shape.
+     */
+    private validateFileAnswer(
+        question: NormalizedQuestion,
+        answer: unknown,
+        basePath: string,
+        errors: ValidationError[],
+    ): void {
+        const files = Array.isArray(answer) ? answer : [answer];
+
+        if (Array.isArray(answer) && answer.length === 0) {
+            if (question.isRequired) {
+                errors.push({
+                    path: basePath,
+                    message: 'File answer is required',
+                    code: 'REQUIRED_FIELD',
+                });
+            }
+            return;
+        }
+
+        for (const [index, file] of files.entries()) {
+            const path = Array.isArray(answer)
+                ? `${basePath}[${index}]`
+                : basePath;
+            if (!this.isFileReference(file)) {
+                errors.push({
+                    path,
+                    message: 'File answer must be an uploaded file reference',
+                    code: 'INVALID_TYPE',
+                });
+                continue;
+            }
+
+            if (
+                question.maxFileSize !== undefined &&
+                file.size !== undefined &&
+                file.size > question.maxFileSize
+            ) {
+                errors.push({
+                    path,
+                    message: `File must be at most ${question.maxFileSize} bytes`,
+                    code: 'FILE_TOO_LARGE',
+                });
+            }
+
+            if (
+                question.allowedFileTypes &&
+                question.allowedFileTypes.length > 0 &&
+                file.mimeType &&
+                !this.matchesAllowedFileType(
+                    file.mimeType,
+                    file.originalName,
+                    question.allowedFileTypes,
+                )
+            ) {
+                errors.push({
+                    path,
+                    message: `File type "${file.mimeType}" is not allowed`,
+                    code: 'FILE_TYPE_NOT_ALLOWED',
+                });
+            }
+        }
+    }
+
+    private isFileReference(file: unknown): file is {
+        fileId: string;
+        originalName?: string;
+        mimeType?: string;
+        size?: number;
+    } {
+        if (!file || typeof file !== 'object' || Array.isArray(file)) {
+            return false;
+        }
+
+        const obj = file as Record<string, unknown>;
+        if (typeof obj.fileId !== 'string' || obj.fileId.length === 0) {
+            return false;
+        }
+
+        if (obj.mimeType !== undefined && typeof obj.mimeType !== 'string') {
+            return false;
+        }
+        if (
+            obj.originalName !== undefined &&
+            typeof obj.originalName !== 'string'
+        ) {
+            return false;
+        }
+        if (obj.size !== undefined && typeof obj.size !== 'number') {
+            return false;
+        }
+
+        return true;
+    }
+
+    private matchesAllowedFileType(
+        mimeType: string,
+        originalName: string | undefined,
+        allowedTypes: string[],
+    ): boolean {
+        const dotIndex = originalName?.lastIndexOf('.') ?? -1;
+        const extension =
+            originalName && dotIndex >= 0
+                ? originalName.slice(dotIndex).toLowerCase()
+                : '';
+        return allowedTypes.some((allowed) => {
+            const value = allowed.toLowerCase();
+            if (value.endsWith('/*')) {
+                return mimeType.toLowerCase().startsWith(value.slice(0, -1));
+            }
+            if (value.startsWith('.')) {
+                return extension === value;
+            }
+            return mimeType.toLowerCase() === value;
+        });
+    }
+
+    /**
      * Apply a SurveyJS validator
      */
     private applyValidator(
@@ -506,6 +628,16 @@ export class ResponseValidatorService {
                         maxLength: q.maxLength as number,
                         min: q.min as number,
                         max: q.max as number,
+                        allowedFileTypes: this.normalizeAllowedFileTypes(
+                            (q.validation as Record<string, unknown>)
+                                ?.allowedFileTypes ?? q.acceptedTypes,
+                        ),
+                        maxFileSize: this.normalizeNumber(
+                            (q.validation as Record<string, unknown>)
+                                ?.maxFileSize ??
+                                q.maxFileSize ??
+                                q.maxSize,
+                        ),
                     };
 
                     questions.push(normalized);
@@ -514,5 +646,32 @@ export class ResponseValidatorService {
         }
 
         return questions;
+    }
+
+    private normalizeAllowedFileTypes(value: unknown): string[] | undefined {
+        if (Array.isArray(value)) {
+            return value
+                .filter((item): item is string => typeof item === 'string')
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+
+        if (typeof value === 'string') {
+            return value
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+
+        return undefined;
+    }
+
+    private normalizeNumber(value: unknown): number | undefined {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
     }
 }

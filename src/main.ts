@@ -59,6 +59,7 @@ async function bootstrap() {
         .setVersion('1.0')
         .addTag('surveys', 'Survey management endpoints')
         .addTag('responses', 'Response collection endpoints')
+        .addTag('files', 'File upload and download endpoints')
         .addTag('health', 'Health check endpoints')
         .addApiKey(
             { type: 'apiKey', name: 'X-User-ID', in: 'header' },

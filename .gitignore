@@ -13,6 +13,9 @@ dist
 # Test coverage
 coverage
 
+# Uploaded files when FILE_STORAGE_DRIVER=local
+uploads/
+
 # macOS metadata
 .DS_Store
 **/.DS_Store

@@ -422,17 +422,46 @@ describe('ResponseValidatorService — all question types', () => {
     // ─── file ─────────────────────────────────────────────────────────────────
 
     describe('type: file', () => {
-        it('accepts any value (file answers are not type-validated)', () => {
+        it('accepts a single uploaded file reference', () => {
             const schema = surveyJsSchema({ name: 'q', type: 'file' });
             expect(
                 svc.validateResponse(schema as never, {
-                    q: [{ name: 'doc.pdf', content: '...' }],
+                    q: {
+                        fileId: 'file-1',
+                        originalName: 'doc.pdf',
+                        mimeType: 'application/pdf',
+                        size: 1024,
+                    },
                 }).valid,
             ).toBe(true);
+        });
+
+        it('accepts an array of uploaded file references', () => {
+            const schema = surveyJsSchema({ name: 'q', type: 'file' });
             expect(
-                svc.validateResponse(schema as never, { q: 'data-url-string' })
-                    .valid,
+                svc.validateResponse(schema as never, {
+                    q: [
+                        { fileId: 'file-1', mimeType: 'image/png', size: 100 },
+                        { fileId: 'file-2', mimeType: 'image/jpeg', size: 200 },
+                    ],
+                }).valid,
             ).toBe(true);
+        });
+
+        it('rejects inline base64/string answers', () => {
+            const schema = surveyJsSchema({ name: 'q', type: 'file' });
+            const r = svc.validateResponse(schema as never, {
+                q: 'data-url-string',
+            });
+            expect(r.errors[0].code).toBe('INVALID_TYPE');
+        });
+
+        it('rejects file reference without fileId', () => {
+            const schema = surveyJsSchema({ name: 'q', type: 'file' });
+            const r = svc.validateResponse(schema as never, {
+                q: { name: 'doc.pdf', content: '...' },
+            });
+            expect(r.errors[0].code).toBe('INVALID_TYPE');
         });
 
         it('flags missing required file', () => {
@@ -443,6 +472,78 @@ describe('ResponseValidatorService — all question types', () => {
             });
             const r = svc.validateResponse(schema as never, {});
             expect(r.missingRequired).toContain('q');
+        });
+
+        it('flags empty required file array', () => {
+            const schema = surveyJsSchema({
+                name: 'q',
+                type: 'file',
+                isRequired: true,
+            });
+            const r = svc.validateResponse(schema as never, { q: [] });
+            expect(r.errors[0].code).toBe('REQUIRED_FIELD');
+        });
+
+        it('enforces acceptedTypes from SurveyJS schema', () => {
+            const schema = surveyJsSchema({
+                name: 'q',
+                type: 'file',
+                acceptedTypes: 'image/*,.pdf',
+            });
+            expect(
+                svc.validateResponse(schema as never, {
+                    q: {
+                        fileId: 'file-1',
+                        originalName: 'photo.png',
+                        mimeType: 'image/png',
+                    },
+                }).valid,
+            ).toBe(true);
+
+            const r = svc.validateResponse(schema as never, {
+                q: {
+                    fileId: 'file-2',
+                    originalName: 'script.js',
+                    mimeType: 'application/javascript',
+                },
+            });
+            expect(r.errors[0].code).toBe('FILE_TYPE_NOT_ALLOWED');
+        });
+
+        it('enforces maxSize from SurveyJS schema', () => {
+            const schema = surveyJsSchema({
+                name: 'q',
+                type: 'file',
+                maxSize: 100,
+            });
+            const r = svc.validateResponse(schema as never, {
+                q: { fileId: 'file-1', mimeType: 'text/plain', size: 101 },
+            });
+            expect(r.errors[0].code).toBe('FILE_TOO_LARGE');
+        });
+
+        it('enforces internal validation.allowedFileTypes and maxFileSize', () => {
+            const schema = internalSchema({
+                id: 'q',
+                type: 'file',
+                title: 'Upload',
+                validation: {
+                    allowedFileTypes: ['application/pdf'],
+                    maxFileSize: 100,
+                },
+            });
+            const r = svc.validateResponse(schema as never, {
+                q: {
+                    fileId: 'file-1',
+                    originalName: 'photo.png',
+                    mimeType: 'image/png',
+                    size: 101,
+                },
+            });
+            expect(r.errors.map((error) => error.code)).toEqual([
+                'FILE_TOO_LARGE',
+                'FILE_TYPE_NOT_ALLOWED',
+            ]);
         });
     });
 

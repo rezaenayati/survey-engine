@@ -24,7 +24,7 @@ Deploy one instance. Integrate from any backend by making HTTP calls.
 - **Response collection** — start a session, save progress page-by-page, submit. Supports anonymous and identified responses.
 - **Webhooks** — get notified the instant a response starts or completes. Survey Engine POSTs to your endpoint with an HMAC-signed payload — no polling needed.
 - **Analytics** — completion funnel, trends over time, per-question breakdowns, text-response word frequency.
-- **Server-side logic** *(advanced, optional)* — evaluate visibility, required, skip, and calculated-value rules on the server without a browser. Useful for bots, integrations, or server-rendered flows. See [docs/schema-reference.md](docs/schema-reference.md#logic-schema-advanced).
+- **Server-side logic** _(advanced, optional)_ — evaluate visibility, required, skip, and calculated-value rules on the server without a browser. Useful for bots, integrations, or server-rendered flows. See [docs/schema-reference.md](docs/schema-reference.md#logic-schema-advanced).
 
 ## What it does NOT do
 
@@ -151,14 +151,16 @@ npm install survey-engine-sdk
 import { SurveyEngineClient } from 'survey-engine-sdk';
 
 const surveyEngine = new SurveyEngineClient({
-  baseUrl: 'http://your-survey-engine-host:3000',
-  userId: currentUser.id,   // resolved from your own auth
+    baseUrl: 'http://your-survey-engine-host:3000',
+    userId: currentUser.id, // resolved from your own auth
 });
 
 // Create a survey
 const survey = await surveyEngine.surveys.create({
-  name: 'Customer Feedback',
-  schemaJson: { pages: [{ name: 'p1', elements: [{ name: 'score', type: 'rating' }] }] },
+    name: 'Customer Feedback',
+    schemaJson: {
+        pages: [{ name: 'p1', elements: [{ name: 'score', type: 'rating' }] }],
+    },
 });
 
 // Publish it
@@ -187,11 +189,11 @@ Content-Type: application/json
 { "name": "Customer Feedback", "schemaJson": { ... } }
 ```
 
-| Header | Required | Description |
-|--------|----------|-------------|
-| `X-User-ID` | No | Authenticated user ID — stored as `createdBy` / `respondentId` and used for ownership checks |
-| `X-Correlation-ID` | No | Trace ID forwarded through logs |
-| `X-API-Key` | When `API_KEY` is set | Global API key (see Security below) |
+| Header             | Required              | Description                                                                                  |
+| ------------------ | --------------------- | -------------------------------------------------------------------------------------------- |
+| `X-User-ID`        | No                    | Authenticated user ID — stored as `createdBy` / `respondentId` and used for ownership checks |
+| `X-Correlation-ID` | No                    | Trace ID forwarded through logs                                                              |
+| `X-API-Key`        | When `API_KEY` is set | Global API key (see Security below)                                                          |
 
 Requests without `X-User-ID` are accepted as anonymous.
 
@@ -199,12 +201,39 @@ Requests without `X-User-ID` are accepted as anonymous.
 
 ```
 1. Load schema:    GET  /surveys/:id/runtime  → pass version.schemaJson to new Survey.Model()
-2. Start session:  POST /responses/start      → store responseId
+2. Start session:  POST /responses            → store responseId
 3. Save progress:  PATCH /responses/:id       → on every page change
-4. Submit:         POST  /responses/:id/complete
+4. Upload files:   POST /files                → store returned `{ fileId, ... }` in file answers
+5. Submit:         POST  /responses/:id/complete
 ```
 
 See [`examples/`](examples/) for a working Next.js integration.
+
+### File Questions
+
+SurveyJS `file` questions are handled through the Files API instead of storing base64 blobs in response JSON.
+
+```typescript
+const uploaded = await surveyEngine.files.upload(file, {
+    surveyId: survey.id,
+    questionId: 'attachment',
+    filename: file.name,
+});
+
+await surveyEngine.responses.update(response.id, {
+    answersJson: {
+        attachment: {
+            fileId: uploaded.id,
+            originalName: uploaded.originalName,
+            mimeType: uploaded.mimeType,
+            size: uploaded.size,
+            url: uploaded.url,
+        },
+    },
+});
+```
+
+By default files are stored on local disk under `uploads/`. Set `FILE_STORAGE_DRIVER=s3` and the S3 variables below to store objects in S3-compatible storage.
 
 ---
 
@@ -224,6 +253,7 @@ API_KEY=change-me-in-production
 ```
 
 Callers must then provide it as:
+
 ```http
 Authorization: Bearer change-me-in-production
 # or
@@ -242,11 +272,11 @@ Configure a webhook URL in your survey's `settings`:
 
 ```typescript
 await surveyEngine.surveys.update(surveyId, {
-  settings: {
-    webhookUrl: 'https://your-service.example.com/webhooks/survey',
-    webhookSecret: 'your-signing-secret',         // optional but recommended
-    webhookEvents: ['response.completed'],         // omit to receive all events
-  },
+    settings: {
+        webhookUrl: 'https://your-service.example.com/webhooks/survey',
+        webhookSecret: 'your-signing-secret', // optional but recommended
+        webhookEvents: ['response.completed'], // omit to receive all events
+    },
 });
 ```
 
@@ -254,12 +284,12 @@ Survey Engine will POST a JSON payload to that URL:
 
 ```json
 {
-  "event": "response.completed",
-  "timestamp": "2026-05-15T10:00:00.000Z",
-  "surveyId": "...",
-  "responseId": "...",
-  "respondentId": "user-abc",
-  "answersJson": { "q1": "Great product!" }
+    "event": "response.completed",
+    "timestamp": "2026-05-15T10:00:00.000Z",
+    "surveyId": "...",
+    "responseId": "...",
+    "respondentId": "user-abc",
+    "answersJson": { "q1": "Great product!" }
 }
 ```
 
@@ -276,9 +306,13 @@ X-Survey-Engine-Delivery: <responseId>
 ```typescript
 import { createHmac } from 'crypto';
 
-function isValidSignature(body: string, header: string, secret: string): boolean {
-  const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
-  return header === expected;
+function isValidSignature(
+    body: string,
+    header: string,
+    secret: string,
+): boolean {
+    const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+    return header === expected;
 }
 ```
 
@@ -292,53 +326,53 @@ Full interactive docs (request bodies, response schemas, try-it-out) at `/api/do
 
 ### Surveys
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/surveys` | Create a draft survey |
-| `GET` | `/surveys` | List surveys (paginated; authenticated users see own surveys, unauthenticated see published) |
-| `GET` | `/surveys/:id` | Get survey |
-| `PATCH` | `/surveys/:id` | Update draft schema / settings |
-| `DELETE` | `/surveys/:id` | Delete survey |
-| `POST` | `/surveys/:id/publish` | Publish — validates schema and creates an immutable version snapshot |
-| `GET` | `/surveys/:id/versions` | List all published versions |
-| `GET` | `/surveys/:id/versions/:versionId` | Get a specific version |
-| `GET` | `/surveys/:id/runtime` | Get the active published version (pass `schemaJson` to SurveyJS) |
-| `GET` | `/surveys/:id/validate` | Validate draft schema and logic rules — returns errors and warnings |
-| `POST` | `/surveys/:id/evaluate-logic` | Evaluate conditional logic against a given answer set |
+| Method   | Path                               | Description                                                                                  |
+| -------- | ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| `POST`   | `/surveys`                         | Create a draft survey                                                                        |
+| `GET`    | `/surveys`                         | List surveys (paginated; authenticated users see own surveys, unauthenticated see published) |
+| `GET`    | `/surveys/:id`                     | Get survey                                                                                   |
+| `PATCH`  | `/surveys/:id`                     | Update draft schema / settings                                                               |
+| `DELETE` | `/surveys/:id`                     | Delete survey                                                                                |
+| `POST`   | `/surveys/:id/publish`             | Publish — validates schema and creates an immutable version snapshot                         |
+| `GET`    | `/surveys/:id/versions`            | List all published versions                                                                  |
+| `GET`    | `/surveys/:id/versions/:versionId` | Get a specific version                                                                       |
+| `GET`    | `/surveys/:id/runtime`             | Get the active published version (pass `schemaJson` to SurveyJS)                             |
+| `GET`    | `/surveys/:id/validate`            | Validate draft schema and logic rules — returns errors and warnings                          |
+| `POST`   | `/surveys/:id/evaluate-logic`      | Evaluate conditional logic against a given answer set                                        |
 
 ### Responses
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/responses/start` | Start a response session — pins respondent to the current active version |
-| `GET` | `/responses` | List responses (filterable by `surveyId`, `status`) |
-| `GET` | `/responses/:id` | Get a single response |
-| `PATCH` | `/responses/:id` | Save partial answers |
-| `POST` | `/responses/:id/complete` | Validate required fields and submit |
-| `DELETE` | `/responses/:id` | Delete response |
-| `GET` | `/responses/:id/validate` | Validate current answers without submitting |
-| `GET` | `/responses/:id/logic` | Evaluate logic rules against current answers (visible/hidden questions, required fields) |
+| Method   | Path                      | Description                                                                              |
+| -------- | ------------------------- | ---------------------------------------------------------------------------------------- |
+| `POST`   | `/responses/start`        | Start a response session — pins respondent to the current active version                 |
+| `GET`    | `/responses`              | List responses (filterable by `surveyId`, `status`)                                      |
+| `GET`    | `/responses/:id`          | Get a single response                                                                    |
+| `PATCH`  | `/responses/:id`          | Save partial answers                                                                     |
+| `POST`   | `/responses/:id/complete` | Validate required fields and submit                                                      |
+| `DELETE` | `/responses/:id`          | Delete response                                                                          |
+| `GET`    | `/responses/:id/validate` | Validate current answers without submitting                                              |
+| `GET`    | `/responses/:id/logic`    | Evaluate logic rules against current answers (visible/hidden questions, required fields) |
 
 ### Analytics
 
 All analytics endpoints accept the same query parameters: `versionMode` (`combined` / `specific`), `versionId`, `startDate`, `endDate`, `status`, `respondentIds`, `answerFilters`.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/surveys/:id/analytics` | Full analytics — all sections in one response |
-| `GET` | `/surveys/:id/analytics/summary` | Totals, completion rate, avg / median time |
-| `GET` | `/surveys/:id/analytics/funnel` | Started → in-progress → completed → abandoned counts |
-| `GET` | `/surveys/:id/analytics/trends` | Daily and weekly response counts |
-| `GET` | `/surveys/:id/analytics/questions` | Per-question breakdowns (choice distributions, averages, word frequency) |
-| `GET` | `/surveys/:id/analytics/questions/:questionId/responses` | Raw text responses for a single question |
-| `GET` | `/surveys/:id/analytics/export` | Download responses as CSV |
+| Method | Path                                                     | Description                                                              |
+| ------ | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET`  | `/surveys/:id/analytics`                                 | Full analytics — all sections in one response                            |
+| `GET`  | `/surveys/:id/analytics/summary`                         | Totals, completion rate, avg / median time                               |
+| `GET`  | `/surveys/:id/analytics/funnel`                          | Started → in-progress → completed → abandoned counts                     |
+| `GET`  | `/surveys/:id/analytics/trends`                          | Daily and weekly response counts                                         |
+| `GET`  | `/surveys/:id/analytics/questions`                       | Per-question breakdowns (choice distributions, averages, word frequency) |
+| `GET`  | `/surveys/:id/analytics/questions/:questionId/responses` | Raw text responses for a single question                                 |
+| `GET`  | `/surveys/:id/analytics/export`                          | Download responses as CSV                                                |
 
 ### Health
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Liveness check |
-| `GET` | `/health/ready` | Readiness check (includes DB connectivity) |
+| Method | Path            | Description                                |
+| ------ | --------------- | ------------------------------------------ |
+| `GET`  | `/health`       | Liveness check                             |
+| `GET`  | `/health/ready` | Readiness check (includes DB connectivity) |
 
 ---
 
@@ -354,21 +388,30 @@ Conditional logic (`visibleIf`, `enableIf`, `requiredIf`) embedded directly in t
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_USER` | `postgres` | PostgreSQL user |
-| `DB_PASSWORD` | `postgres` | PostgreSQL password |
-| `DB_NAME` | `survey_engine` | PostgreSQL database |
-| `NODE_ENV` | `development` | `production` disables synchronize, enables migrations |
-| `PORT` | `3000` | HTTP listen port |
-| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
-| `API_KEY` | *(unset)* | Optional global API key |
-| `WEBHOOK_SECRET` | *(unset)* | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
-| `THROTTLE_LIMIT` | `100` | Max requests per window per IP |
-| `THROTTLE_TTL` | `60` | Rate-limit window in seconds |
-| `LOG_LEVEL` | `info` | `trace` / `debug` / `info` / `warn` / `error` |
+| Variable               | Default         | Description                                                                      |
+| ---------------------- | --------------- | -------------------------------------------------------------------------------- |
+| `DB_HOST`              | `localhost`     | PostgreSQL host                                                                  |
+| `DB_PORT`              | `5432`          | PostgreSQL port                                                                  |
+| `DB_USER`              | `postgres`      | PostgreSQL user                                                                  |
+| `DB_PASSWORD`          | `postgres`      | PostgreSQL password                                                              |
+| `DB_NAME`              | `survey_engine` | PostgreSQL database                                                              |
+| `NODE_ENV`             | `development`   | `production` disables synchronize, enables migrations                            |
+| `PORT`                 | `3000`          | HTTP listen port                                                                 |
+| `CORS_ORIGINS`         | `*`             | Comma-separated allowed origins                                                  |
+| `API_KEY`              | _(unset)_       | Optional global API key                                                          |
+| `WEBHOOK_SECRET`       | _(unset)_       | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
+| `FILE_STORAGE_DRIVER`  | `local`         | File storage driver: `local` or `s3`                                             |
+| `FILE_LOCAL_DIR`       | `uploads`       | Local storage directory relative to the process working directory                |
+| `FILE_MAX_SIZE_BYTES`  | `26214400`      | Global upload cap before question-level validation                               |
+| `FILE_PUBLIC_BASE_URL` | _(unset)_       | Optional public base URL for locally stored files                                |
+| `S3_BUCKET`            | _(unset)_       | Required when `FILE_STORAGE_DRIVER=s3`                                           |
+| `S3_REGION`            | `us-east-1`     | S3 region                                                                        |
+| `S3_ENDPOINT`          | _(unset)_       | Optional S3-compatible endpoint (MinIO, R2, etc.)                                |
+| `S3_FORCE_PATH_STYLE`  | `false`         | Set `true` for MinIO/path-style providers                                        |
+| `S3_PUBLIC_BASE_URL`   | _(unset)_       | Optional public CDN/base URL for S3 objects                                      |
+| `THROTTLE_LIMIT`       | `100`           | Max requests per window per IP                                                   |
+| `THROTTLE_TTL`         | `60`            | Rate-limit window in seconds                                                     |
+| `LOG_LEVEL`            | `info`          | `trace` / `debug` / `info` / `warn` / `error`                                    |
 
 ---
 
