@@ -263,7 +263,12 @@ class ResponsesClient extends BaseClient {
 
 // ─── Files client ─────────────────────────────────────────────────────────────
 
+/** Upload, download, and delete binaries for SurveyJS `file` questions (`POST/GET/DELETE /files`). */
 class FilesClient extends BaseClient {
+    /**
+     * Multipart upload. When `surveyId` and `questionId` are set, the API applies the
+     * survey question’s `acceptedTypes` / `maxSize` rules.
+     */
     async upload(
         file: Blob | ArrayBuffer | Uint8Array,
         options: UploadFileOptions = {},
@@ -301,6 +306,7 @@ class FilesClient extends BaseClient {
         return res;
     }
 
+    /** Remove an uploaded file (and backing object, when using cloud storage). */
     delete(id: string): Promise<void> {
         return this.request('DELETE', `/files/${id}`);
     }

@@ -77,7 +77,7 @@ surveyModel.onComplete.add(async () => {
 
 ## File Questions
 
-Upload binary data through the Files API, then store the returned file reference in the response answer.
+Upload binary data through the Files API, then store the returned metadata in the response answer (see also `FileAnswerValue` in types). The engine returns `storageProvider` (`local` | `s3` | `firebase`) and a public `url` when configured (e.g. `FILE_PUBLIC_BASE_URL` for local).
 
 ```typescript
 const uploaded = await client.files.upload(file, {
@@ -100,6 +100,10 @@ await client.responses.update(response.id, {
 ```
 
 Server-side storage is configured in survey-engine via `FILE_STORAGE_DRIVER` (`local`, `s3`, or `firebase`).
+
+## Examples
+
+The repo includes a full **Next.js 15** sample (SurveyJS Creator, multipart uploads via a BFF, analytics): [`examples/nextjs`](https://github.com/rezaenayati/survey-engine/tree/main/examples/nextjs).
 
 ## Webhooks
 
@@ -174,6 +178,10 @@ import type {
     LogicSchema,
     CreateSurveyInput,
     SurveyAnalytics,
+    UploadedFile,
+    FileAnswerValue,
+    FileStorageProvider,
+    UploadFileOptions,
     // ... etc.
 } from 'survey-engine-sdk';
 ```

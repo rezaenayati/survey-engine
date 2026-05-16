@@ -144,11 +144,11 @@ export interface UpdateResponseInput {
     metadata?: Record<string, unknown>;
 }
 
+/** Options for `POST /files` (multipart). MIME type comes from the uploaded file. */
 export interface UploadFileOptions {
     surveyId?: string;
     questionId?: string;
     filename?: string;
-    mimeType?: string;
 }
 
 export interface PaginationQuery {
