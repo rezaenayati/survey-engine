@@ -337,4 +337,138 @@ describe('SurveysService', () => {
             );
         });
     });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // duplicate
+    // ──────────────────────────────────────────────────────────────────────────
+
+    describe('duplicate', () => {
+        const original: Survey = {
+            id: 'survey-1',
+            name: 'NPS Survey',
+            description: 'Original description',
+            createdBy: 'user-1',
+            status: SurveyStatus.PUBLISHED,
+            draftSchemaJson: { pages: [] },
+            draftLogicJson: { version: '1.0', rules: [] },
+            settings: {
+                allowAnonymous: true,
+                requireAuth: false,
+                accessTokenRequired: false,
+            },
+            activeVersionId: 'v1',
+            activeVersion: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        } as unknown as Survey;
+
+        beforeEach(() => {
+            surveyRepo.findOne.mockResolvedValue(original);
+            surveyRepo.save.mockImplementation(async (entity) => ({
+                id: 'survey-copy',
+                ...entity,
+            }));
+        });
+
+        it('creates a copy with "(copy)" appended to the name', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ name: 'NPS Survey (copy)' }),
+            );
+        });
+
+        it('copies description', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    description: 'Original description',
+                }),
+            );
+        });
+
+        it('creates a deep copy of draftSchemaJson', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            const created = surveyRepo.create.mock.calls[0][0] as Record<
+                string,
+                unknown
+            >;
+            expect(created.draftSchemaJson).toEqual(original.draftSchemaJson);
+            expect(created.draftSchemaJson).not.toBe(original.draftSchemaJson);
+        });
+
+        it('creates a deep copy of draftLogicJson', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            const created = surveyRepo.create.mock.calls[0][0] as Record<
+                string,
+                unknown
+            >;
+            expect(created.draftLogicJson).toEqual(original.draftLogicJson);
+            expect(created.draftLogicJson).not.toBe(original.draftLogicJson);
+        });
+
+        it('sets status to DRAFT regardless of original status', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ status: SurveyStatus.DRAFT }),
+            );
+        });
+
+        it('sets createdBy from ctx.userId', async () => {
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ createdBy: 'user-1' }),
+            );
+        });
+
+        it('sets createdBy to null for anonymous caller', async () => {
+            await service.duplicate({ correlationId: 'c' }, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ createdBy: null }),
+            );
+        });
+
+        it('handles null draftSchemaJson gracefully', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                ...original,
+                draftSchemaJson: null,
+            });
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ draftSchemaJson: null }),
+            );
+        });
+
+        it('handles null draftLogicJson gracefully', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                ...original,
+                draftLogicJson: null,
+            });
+            await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ draftLogicJson: null }),
+            );
+        });
+
+        it('throws NotFoundException when original survey does not exist', async () => {
+            surveyRepo.findOne.mockResolvedValue(null);
+            await expect(
+                service.duplicate(ctx, 'nonexistent'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('throws ForbiddenException when caller does not own the survey', async () => {
+            await expect(
+                service.duplicate(
+                    { userId: 'other-user', correlationId: 'c' },
+                    'survey-1',
+                ),
+            ).rejects.toThrow('You do not have access to this survey');
+        });
+
+        it('saves and returns the copied survey', async () => {
+            const result = await service.duplicate(ctx, 'survey-1');
+            expect(surveyRepo.save).toHaveBeenCalled();
+            expect(result.id).toBe('survey-copy');
+        });
+    });
 });
