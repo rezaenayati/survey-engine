@@ -1,6 +1,6 @@
 {
   "name": "survey-engine-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript SDK for the Survey Engine API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +21,13 @@
     "build:watch": "tsc --watch",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["survey", "surveyjs", "forms", "sdk", "backend"],
+  "keywords": [
+    "survey",
+    "surveyjs",
+    "forms",
+    "sdk",
+    "backend"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
