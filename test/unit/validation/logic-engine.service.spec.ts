@@ -508,4 +508,240 @@ describe('LogicEngineService', () => {
             expect(result.valid).toBe(false);
         });
     });
+
+    // ─── Expression evaluator ─────────────────────────────────────────────────
+
+    describe('evaluateExpression', () => {
+        const answers = { q1: 3, q2: 7, name: 'Jane', last: 'Doe', flag: true };
+
+        describe('arithmetic', () => {
+            it('adds two question references', () => {
+                expect(service.evaluateExpression('{q1} + {q2}', answers)).toBe(
+                    10,
+                );
+            });
+
+            it('subtracts', () => {
+                expect(service.evaluateExpression('{q2} - {q1}', answers)).toBe(
+                    4,
+                );
+            });
+
+            it('multiplies', () => {
+                expect(service.evaluateExpression('{q1} * {q2}', answers)).toBe(
+                    21,
+                );
+            });
+
+            it('divides', () => {
+                expect(
+                    service.evaluateExpression('{q2} / {q1}', answers),
+                ).toBeCloseTo(2.333);
+            });
+
+            it('returns 0 on division by zero', () => {
+                expect(service.evaluateExpression('{q1} / 0', answers)).toBe(0);
+            });
+
+            it('modulo', () => {
+                expect(service.evaluateExpression('{q2} % {q1}', answers)).toBe(
+                    1,
+                );
+            });
+
+            it('power', () => {
+                expect(service.evaluateExpression('{q1} ** 2', answers)).toBe(
+                    9,
+                );
+            });
+
+            it('respects operator precedence', () => {
+                expect(
+                    service.evaluateExpression('{q1} + {q2} * 2', answers),
+                ).toBe(17);
+            });
+
+            it('respects parentheses', () => {
+                expect(
+                    service.evaluateExpression('({q1} + {q2}) * 2', answers),
+                ).toBe(20);
+            });
+
+            it('handles unary minus', () => {
+                expect(service.evaluateExpression('-{q1}', answers)).toBe(-3);
+            });
+
+            it('handles literal numbers', () => {
+                expect(service.evaluateExpression('10 + 5', answers)).toBe(15);
+            });
+        });
+
+        describe('string operations', () => {
+            it('concatenates with + when either side is a string', () => {
+                expect(
+                    service.evaluateExpression(
+                        '{name} + " " + {last}',
+                        answers,
+                    ),
+                ).toBe('Jane Doe');
+            });
+
+            it('handles string literals', () => {
+                expect(
+                    service.evaluateExpression(
+                        '"hello" + " " + "world"',
+                        answers,
+                    ),
+                ).toBe('hello world');
+            });
+        });
+
+        describe('built-in functions', () => {
+            it('ROUND with no decimals', () => {
+                expect(service.evaluateExpression('ROUND(3.7)', answers)).toBe(
+                    4,
+                );
+            });
+
+            it('ROUND with decimals', () => {
+                expect(
+                    service.evaluateExpression('ROUND(3.14159, 2)', answers),
+                ).toBe(3.14);
+            });
+
+            it('FLOOR', () => {
+                expect(service.evaluateExpression('FLOOR(3.9)', answers)).toBe(
+                    3,
+                );
+            });
+
+            it('CEIL', () => {
+                expect(service.evaluateExpression('CEIL(3.1)', answers)).toBe(
+                    4,
+                );
+            });
+
+            it('ABS of negative', () => {
+                expect(service.evaluateExpression('ABS(-5)', answers)).toBe(5);
+            });
+
+            it('MIN', () => {
+                expect(
+                    service.evaluateExpression('MIN({q1}, {q2})', answers),
+                ).toBe(3);
+            });
+
+            it('MAX', () => {
+                expect(
+                    service.evaluateExpression('MAX({q1}, {q2})', answers),
+                ).toBe(7);
+            });
+
+            it('SUM', () => {
+                expect(
+                    service.evaluateExpression('SUM({q1}, {q2}, 10)', answers),
+                ).toBe(20);
+            });
+
+            it('CONCAT', () => {
+                expect(
+                    service.evaluateExpression(
+                        'CONCAT({name}, " ", {last})',
+                        answers,
+                    ),
+                ).toBe('Jane Doe');
+            });
+
+            it('IF truthy branch', () => {
+                expect(
+                    service.evaluateExpression(
+                        'IF({flag}, "yes", "no")',
+                        answers,
+                    ),
+                ).toBe('yes');
+            });
+
+            it('IF falsy branch', () => {
+                expect(
+                    service.evaluateExpression('IF(0, "yes", "no")', answers),
+                ).toBe('no');
+            });
+
+            it('nested functions', () => {
+                expect(
+                    service.evaluateExpression(
+                        'ROUND(SUM({q1}, {q2}) / 2, 1)',
+                        answers,
+                    ),
+                ).toBe(5);
+            });
+        });
+
+        describe('reference resolution', () => {
+            it('returns null for missing reference', () => {
+                expect(
+                    service.evaluateExpression('{missing}', answers),
+                ).toBeNull();
+            });
+
+            it('returns null on parse error', () => {
+                expect(
+                    service.evaluateExpression('{unclosed', answers),
+                ).toBeNull();
+            });
+        });
+
+        describe('CALCULATED rule integration', () => {
+            it('populates calculatedValues when condition is met', () => {
+                const logic: LogicSchema = {
+                    version: '1.0',
+                    rules: [
+                        {
+                            id: 'calc1',
+                            condition: {
+                                questionId: 'q1',
+                                operator: ComparisonOperator.IS_NOT_EMPTY,
+                            },
+                            action: {
+                                type: RuleType.CALCULATED,
+                                targetId: 'total',
+                                targetType: 'question',
+                                expression: '{q1} + {q2}',
+                            },
+                        },
+                    ],
+                };
+                const result = service.evaluateLogic(baseSchema, logic, {
+                    q1: 4,
+                    q2: 6,
+                });
+                expect(result.calculatedValues['total']).toBe(10);
+            });
+
+            it('uses static value when no expression is set', () => {
+                const logic: LogicSchema = {
+                    version: '1.0',
+                    rules: [
+                        {
+                            id: 'calc2',
+                            condition: {
+                                questionId: 'q1',
+                                operator: ComparisonOperator.IS_NOT_EMPTY,
+                            },
+                            action: {
+                                type: RuleType.CALCULATED,
+                                targetId: 'label',
+                                targetType: 'question',
+                                value: 'fixed',
+                            },
+                        },
+                    ],
+                };
+                const result = service.evaluateLogic(baseSchema, logic, {
+                    q1: 'anything',
+                });
+                expect(result.calculatedValues['label']).toBe('fixed');
+            });
+        });
+    });
 });

@@ -14,6 +14,26 @@ import {
 import { SurveySchema } from '../interfaces/survey-schema.interface';
 import { SchemaValidatorService } from './schema-validator.service';
 
+interface ExprToken {
+    type:
+        | 'NUMBER'
+        | 'STRING'
+        | 'REF'
+        | 'IDENT'
+        | 'PLUS'
+        | 'MINUS'
+        | 'STAR'
+        | 'SLASH'
+        | 'PERCENT'
+        | 'STARSTAR'
+        | 'LPAREN'
+        | 'RPAREN'
+        | 'COMMA'
+        | 'EOF';
+    raw: string;
+    value: unknown;
+}
+
 /**
  * Service for evaluating survey logic rules
  */
@@ -73,7 +93,7 @@ export class LogicEngineService {
             result.ruleResults.push(ruleResult);
 
             if (ruleResult.conditionMet && ruleResult.action) {
-                this.applyRuleAction(ruleResult.action, result);
+                this.applyRuleAction(ruleResult.action, result, answers);
             }
         }
 
@@ -371,6 +391,7 @@ export class LogicEngineService {
             expression?: string;
         },
         result: LogicEvaluationResult,
+        answers: Record<string, unknown>,
     ): void {
         switch (action.type) {
             case RuleType.VISIBILITY:
@@ -415,11 +436,9 @@ export class LogicEngineService {
                 break;
 
             case RuleType.CALCULATED:
-                // Calculate field value
                 if (action.expression) {
-                    // TODO: Implement expression evaluation
                     result.calculatedValues[action.targetId] =
-                        action.expression;
+                        this.evaluateExpression(action.expression, answers);
                 } else if (action.value !== undefined) {
                     result.calculatedValues[action.targetId] = action.value;
                 }
@@ -607,5 +626,290 @@ export class LogicEngineService {
             ...new Set([...schemaRequired, ...result.requiredQuestions]),
         ];
         return allRequired.filter((id) => result.visibleQuestions.includes(id));
+    }
+
+    // ─── Expression evaluator ────────────────────────────────────────────────────
+
+    /**
+     * Safely evaluate a calculated field expression.
+     *
+     * Syntax:
+     *   - `{questionId}` — substitutes the current answer value
+     *   - Arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
+     *   - String literals: `"hello"` or `'hello'`
+     *   - Parentheses: `({q1} + {q2}) * 2`
+     *   - Built-in functions: ROUND(x, decimals?), FLOOR(x), CEIL(x), ABS(x),
+     *     MIN(...), MAX(...), SUM(...), CONCAT(...), IF(cond, then, else)
+     *
+     * Returns `null` on any parse / evaluation error.
+     *
+     * @example
+     *   evaluateExpression('{score1} + {score2}', { score1: 3, score2: 7 }) // → 10
+     *   evaluateExpression('ROUND({avg}, 2)',     { avg: 3.14159 })          // → 3.14
+     *   evaluateExpression('CONCAT({first}, " ", {last})', { first: 'Jane', last: 'Doe' }) // → "Jane Doe"
+     */
+    evaluateExpression(
+        expression: string,
+        answers: Record<string, unknown>,
+    ): unknown {
+        try {
+            const tokens = this.tokenizeExpression(expression);
+            let pos = 0;
+
+            const eof: ExprToken = { type: 'EOF', raw: '', value: undefined };
+            const peek = (): ExprToken => tokens[pos] ?? eof;
+            const consume = (): ExprToken => tokens[pos++] ?? eof;
+            const expect = (type: ExprToken['type']): ExprToken => {
+                const t = consume();
+                if (t.type !== type)
+                    throw new Error(
+                        `Expected ${type} but got ${t.type} ("${t.raw}")`,
+                    );
+                return t;
+            };
+
+            const parseArgs = (): unknown[] => {
+                const args: unknown[] = [];
+                if (peek().type === 'RPAREN') return args;
+                args.push(parseExpr());
+                while (peek().type === 'COMMA') {
+                    consume();
+                    args.push(parseExpr());
+                }
+                return args;
+            };
+
+            const parsePrimary = (): unknown => {
+                const t = peek();
+
+                if (t.type === 'NUMBER') {
+                    consume();
+                    return t.value;
+                }
+                if (t.type === 'STRING') {
+                    consume();
+                    return t.value;
+                }
+                if (t.type === 'REF') {
+                    consume();
+                    return answers[t.value as string] ?? null;
+                }
+                if (t.type === 'IDENT') {
+                    consume();
+                    if (peek().type !== 'LPAREN') {
+                        return answers[t.raw] ?? null;
+                    }
+                    expect('LPAREN');
+                    const args = parseArgs();
+                    expect('RPAREN');
+                    return this.callExprBuiltIn(t.raw.toUpperCase(), args);
+                }
+                if (t.type === 'LPAREN') {
+                    consume();
+                    const val = parseExpr();
+                    expect('RPAREN');
+                    return val;
+                }
+                throw new Error(`Unexpected token: "${t.raw}"`);
+            };
+
+            const parseUnary = (): unknown => {
+                if (peek().type === 'MINUS') {
+                    consume();
+                    return -(parseUnary() as number);
+                }
+                return parsePrimary();
+            };
+
+            const parsePower = (): unknown => {
+                const base = parseUnary();
+                if (peek().type === 'STARSTAR') {
+                    consume();
+                    return Math.pow(base as number, parsePower() as number);
+                }
+                return base;
+            };
+
+            const parseMulDiv = (): unknown => {
+                let left = parsePower();
+                while (
+                    peek().type === 'STAR' ||
+                    peek().type === 'SLASH' ||
+                    peek().type === 'PERCENT'
+                ) {
+                    const op = consume().type;
+                    const right = parsePower();
+                    if (op === 'STAR')
+                        left = (left as number) * (right as number);
+                    else if (op === 'SLASH') {
+                        const r = right as number;
+                        left = r !== 0 ? (left as number) / r : 0;
+                    } else left = (left as number) % (right as number);
+                }
+                return left;
+            };
+
+            const parseAddSub = (): unknown => {
+                let left = parseMulDiv();
+                while (peek().type === 'PLUS' || peek().type === 'MINUS') {
+                    const op = consume().type;
+                    const right = parseMulDiv();
+                    if (op === 'PLUS') {
+                        // numeric addition or string concatenation
+                        left =
+                            typeof left === 'string' ||
+                            typeof right === 'string'
+                                ? this.toStr(left) + this.toStr(right)
+                                : (left as number) + (right as number);
+                    } else {
+                        left = (left as number) - (right as number);
+                    }
+                }
+                return left;
+            };
+
+            const parseExpr = (): unknown => parseAddSub();
+
+            return parseExpr();
+        } catch {
+            return null;
+        }
+    }
+
+    private callExprBuiltIn(name: string, args: unknown[]): unknown {
+        const toNum = (v: unknown): number => {
+            if (typeof v === 'number') return v;
+            const n = parseFloat(this.toStr(v));
+            return isNaN(n) ? 0 : n;
+        };
+        const nums = args.map(toNum);
+
+        switch (name) {
+            case 'ROUND': {
+                const decimals = nums[1] ?? 0;
+                const factor = Math.pow(10, decimals);
+                return Math.round(nums[0] * factor) / factor;
+            }
+            case 'FLOOR':
+                return Math.floor(nums[0]);
+            case 'CEIL':
+                return Math.ceil(nums[0]);
+            case 'ABS':
+                return Math.abs(nums[0]);
+            case 'MIN':
+                return Math.min(...nums);
+            case 'MAX':
+                return Math.max(...nums);
+            case 'SUM':
+                return nums.reduce((a, b) => a + b, 0);
+            case 'CONCAT':
+                return args.map((a) => this.toStr(a)).join('');
+            case 'IF':
+                return args[0] ? args[1] : args[2];
+            default:
+                return null;
+        }
+    }
+
+    private tokenizeExpression(expr: string): ExprToken[] {
+        const tokens: ExprToken[] = [];
+        let i = 0;
+
+        while (i < expr.length) {
+            // whitespace
+            if (/\s/.test(expr[i])) {
+                i++;
+                continue;
+            }
+
+            // {questionId} reference
+            if (expr[i] === '{') {
+                const end = expr.indexOf('}', i);
+                if (end === -1) throw new Error('Unclosed { in expression');
+                const id = expr.slice(i + 1, end);
+                tokens.push({
+                    type: 'REF',
+                    raw: expr.slice(i, end + 1),
+                    value: id,
+                });
+                i = end + 1;
+                continue;
+            }
+
+            // string literal "..." or '...'
+            if (expr[i] === '"' || expr[i] === "'") {
+                const q = expr[i];
+                let s = '';
+                i++;
+                while (i < expr.length && expr[i] !== q) {
+                    if (expr[i] === '\\') {
+                        i++;
+                        s += expr[i] ?? '';
+                    } else {
+                        s += expr[i];
+                    }
+                    i++;
+                }
+                i++; // closing quote
+                tokens.push({ type: 'STRING', raw: `${q}${s}${q}`, value: s });
+                continue;
+            }
+
+            // number literal
+            if (
+                /[0-9]/.test(expr[i]) ||
+                (expr[i] === '.' && /[0-9]/.test(expr[i + 1] ?? ''))
+            ) {
+                let raw = '';
+                while (i < expr.length && /[0-9.]/.test(expr[i]))
+                    raw += expr[i++];
+                tokens.push({ type: 'NUMBER', raw, value: parseFloat(raw) });
+                continue;
+            }
+
+            // identifier / function name
+            if (/[a-zA-Z_]/.test(expr[i])) {
+                let raw = '';
+                while (i < expr.length && /[a-zA-Z_0-9]/.test(expr[i]))
+                    raw += expr[i++];
+                tokens.push({ type: 'IDENT', raw, value: undefined });
+                continue;
+            }
+
+            // two-char operators
+            if (expr.slice(i, i + 2) === '**') {
+                tokens.push({ type: 'STARSTAR', raw: '**', value: undefined });
+                i += 2;
+                continue;
+            }
+
+            // single-char operators
+            const singles: Record<string, ExprToken['type']> = {
+                '+': 'PLUS',
+                '-': 'MINUS',
+                '*': 'STAR',
+                '/': 'SLASH',
+                '%': 'PERCENT',
+                '(': 'LPAREN',
+                ')': 'RPAREN',
+                ',': 'COMMA',
+            };
+            if (singles[expr[i]]) {
+                tokens.push({
+                    type: singles[expr[i]],
+                    raw: expr[i],
+                    value: undefined,
+                });
+                i++;
+                continue;
+            }
+
+            throw new Error(
+                `Unexpected character "${expr[i]}" at position ${i}`,
+            );
+        }
+
+        tokens.push({ type: 'EOF', raw: '', value: undefined });
+        return tokens;
     }
 }
