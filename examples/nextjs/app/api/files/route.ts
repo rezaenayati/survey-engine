@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { surveyEngineErrorToResponse } from '@/lib/survey-engine-error-response';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
 import { SurveyEngineError } from 'survey-engine-sdk';
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
         return Response.json(uploaded, { status: 201 });
     } catch (err) {
         if (err instanceof SurveyEngineError) {
-            return Response.json(err.body, { status: err.status });
+            return surveyEngineErrorToResponse(err);
         }
         console.error(err);
         return Response.json({ message: 'Upload failed' }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
+import { apiRouteErrorResponse } from '@/lib/survey-engine-error-response';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError } from 'survey-engine-sdk';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,12 +10,6 @@ export async function GET(request: NextRequest, { params }: Params) {
         const client = createClient(getUserIdFromRequest(request));
         return Response.json(await client.surveys.getRuntime(id));
     } catch (err) {
-        if (err instanceof SurveyEngineError) {
-            return Response.json(err.body, { status: err.status });
-        }
-        return Response.json(
-            { message: 'Internal server error' },
-            { status: 500 },
-        );
+        return apiRouteErrorResponse(err);
     }
 }

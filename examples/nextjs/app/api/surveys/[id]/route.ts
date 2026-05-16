@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { apiRouteErrorResponse } from '@/lib/survey-engine-error-response';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError, type UpdateSurveyInput } from 'survey-engine-sdk';
+import type { UpdateSurveyInput } from 'survey-engine-sdk';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -38,9 +39,5 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 }
 
 function handleError(err: unknown): Response {
-    if (err instanceof SurveyEngineError) {
-        return Response.json(err.body, { status: err.status });
-    }
-    console.error(err);
-    return Response.json({ message: 'Internal server error' }, { status: 500 });
+    return apiRouteErrorResponse(err);
 }

@@ -25,8 +25,14 @@ export function TakeSurveyClient({ surveyId, schema }: Props) {
                 metadata: { source: 'nextjs-example' },
             }),
         })
-            .then((r) => r.json())
-            .then((raw: unknown) => {
+            .then(async (r) => {
+                const raw: unknown = await r.json().catch(() => ({}));
+                if (!r.ok) {
+                    const msg =
+                        jsonStringField(raw, 'message') ??
+                        `Could not start session (${r.status})`;
+                    throw new Error(msg);
+                }
                 const id = jsonStringField(raw, 'id');
                 if (!id) {
                     throw new Error('Invalid start response payload');
@@ -34,9 +40,11 @@ export function TakeSurveyClient({ surveyId, schema }: Props) {
                 responseIdRef.current = id;
                 setReady(true);
             })
-            .catch(() =>
+            .catch((e: unknown) =>
                 setError(
-                    'Could not start your session. Please refresh and try again.',
+                    e instanceof Error
+                        ? e.message
+                        : 'Could not start your session. Please refresh and try again.',
                 ),
             );
     }, [surveyId]);

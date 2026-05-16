@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation';
 
 type Props = { params: Promise<{ id: string }> };
 
+/** Always load live survey-engine state (see `createNoStoreFetch` in survey-engine.ts). */
+export const dynamic = 'force-dynamic';
+
 export default async function TakeSurveyPage({ params }: Props) {
     const { id } = await params;
 

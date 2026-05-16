@@ -143,6 +143,8 @@ Keep `SURVEY_ENGINE_URL` and `NEXT_PUBLIC_SURVEY_ENGINE_URL` aligned in local de
 ## Troubleshooting
 
 - **Port clash**: Engine and Next both default to 3000 — run Next on another port (e.g. `-p 3001` or `PORT=4000`) and update `.env.local` if you reference those URLs.
+- **`Cannot POST /responses`** (generic framework 404): The API you call with `SURVEY_ENGINE_URL` has **no matching route** for that path/method. A common mistake is pointing `SURVEY_ENGINE_URL` at the Next dev server (`:3001`); if **survey** calls also fail, fix that. If **only** `POST /responses` fails while `PATCH /surveys` etc. work, hit the engine directly:  
+  `curl -X POST "$SURVEY_ENGINE_URL/responses" -H "Content-Type: application/json" -H "X-User-ID: admin" -d '{"surveyId":"<uuid>"}'` — you should get **201** for a published survey. If curl also 404s, the running API build may be too old (needs `POST /responses`) or a proxy is blocking `/responses`.
 - **Upload 401**: Engine has `API_KEY` but `.env.local` is missing `SURVEY_ENGINE_API_KEY`.
 - **Upload 400 / validation**: Example sends `surveyId` and `questionId`; check `acceptedTypes` and `maxSize` on the file question.
 - **Broken image preview**: Set `FILE_PUBLIC_BASE_URL` on the engine and/or `NEXT_PUBLIC_SURVEY_ENGINE_URL` in the example.

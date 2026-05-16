@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { apiRouteErrorResponse } from '@/lib/survey-engine-error-response';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError, type StartResponseInput } from 'survey-engine-sdk';
+import type { StartResponseInput } from 'survey-engine-sdk';
 
 export async function POST(request: NextRequest) {
     try {
@@ -14,12 +15,6 @@ export async function POST(request: NextRequest) {
         });
         return Response.json(response, { status: 201 });
     } catch (err) {
-        if (err instanceof SurveyEngineError) {
-            return Response.json(err.body, { status: err.status });
-        }
-        return Response.json(
-            { message: 'Internal server error' },
-            { status: 500 },
-        );
+        return apiRouteErrorResponse(err);
     }
 }

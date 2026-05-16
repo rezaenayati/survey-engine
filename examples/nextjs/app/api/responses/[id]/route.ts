@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
+import { apiRouteErrorResponse } from '@/lib/survey-engine-error-response';
 import { createClient, getUserIdFromRequest } from '@/lib/survey-engine';
-import { SurveyEngineError, type UpdateResponseInput } from 'survey-engine-sdk';
+import type { UpdateResponseInput } from 'survey-engine-sdk';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,12 +13,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         const body = raw as UpdateResponseInput;
         return Response.json(await client.responses.update(id, body));
     } catch (err) {
-        if (err instanceof SurveyEngineError) {
-            return Response.json(err.body, { status: err.status });
-        }
-        return Response.json(
-            { message: 'Internal server error' },
-            { status: 500 },
-        );
+        return apiRouteErrorResponse(err);
     }
 }
