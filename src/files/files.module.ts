@@ -9,6 +9,7 @@ import { FilesService } from './files.service';
 import { FILE_STORAGE } from './storage/file-storage.interface';
 import { LocalFileStorage } from './storage/local-file.storage';
 import { S3FileStorage } from './storage/s3-file.storage';
+import { FirebaseFileStorage } from './storage/firebase-file.storage';
 import { SurveysModule } from '../surveys/surveys.module';
 
 @Module({
@@ -37,9 +38,11 @@ import { SurveysModule } from '../surveys/surveys.module';
             provide: FILE_STORAGE,
             inject: [ConfigService],
             useFactory: (config: ConfigService) => {
-                return config.get<string>('FILE_STORAGE_DRIVER') === 's3'
-                    ? new S3FileStorage(config)
-                    : new LocalFileStorage(config);
+                const driver = config.get<string>('FILE_STORAGE_DRIVER');
+                if (driver === 's3') return new S3FileStorage(config);
+                if (driver === 'firebase')
+                    return new FirebaseFileStorage(config);
+                return new LocalFileStorage(config);
             },
         },
     ],

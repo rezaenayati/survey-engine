@@ -99,6 +99,8 @@ await client.responses.update(response.id, {
 });
 ```
 
+Server-side storage is configured in survey-engine via `FILE_STORAGE_DRIVER` (`local`, `s3`, or `firebase`).
+
 ## Webhooks
 
 Configure a webhook URL on a survey to receive signed HTTP events when responses start or complete:

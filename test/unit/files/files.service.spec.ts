@@ -30,6 +30,8 @@ function multerFile(overrides: Partial<Express.Multer.File> = {}) {
 }
 
 describe('FilesService', () => {
+    let storageDriver = 'local';
+    let publicBaseUrl: string | undefined;
     const savedFiles: UploadedFile[] = [];
     const storage = {
         store: jest.fn(),
@@ -85,8 +87,9 @@ describe('FilesService', () => {
                         get: jest.fn(
                             (key: string, fallback?: unknown): unknown => {
                                 const values: Record<string, unknown> = {
-                                    FILE_STORAGE_DRIVER: 'local',
+                                    FILE_STORAGE_DRIVER: storageDriver,
                                     FILE_MAX_SIZE_BYTES: 100,
+                                    FILE_PUBLIC_BASE_URL: publicBaseUrl,
                                 };
                                 return values[key] ?? fallback;
                             },
@@ -101,6 +104,8 @@ describe('FilesService', () => {
         }).compile();
 
         service = module.get(FilesService);
+        storageDriver = 'local';
+        publicBaseUrl = undefined;
     });
 
     it('stores file bytes and persists metadata', async () => {
@@ -116,6 +121,49 @@ describe('FilesService', () => {
         expect(file.id).toBe('file-1');
         expect(file.storageProvider).toBe(FileStorageProvider.LOCAL);
         expect(file.createdBy).toBe('user-1');
+    });
+
+    it('marks uploaded file as firebase provider when driver is firebase', async () => {
+        storageDriver = 'firebase';
+        const module = await Test.createTestingModule({
+            providers: [
+                FilesService,
+                {
+                    provide: getRepositoryToken(UploadedFile),
+                    useValue: repository,
+                },
+                {
+                    provide: FILE_STORAGE,
+                    useValue: storage,
+                },
+                {
+                    provide: ConfigService,
+                    useValue: {
+                        get: jest.fn(
+                            (key: string, fallback?: unknown): unknown => {
+                                const values: Record<string, unknown> = {
+                                    FILE_STORAGE_DRIVER: storageDriver,
+                                    FILE_MAX_SIZE_BYTES: 100,
+                                };
+                                return values[key] ?? fallback;
+                            },
+                        ),
+                    },
+                },
+                {
+                    provide: SurveyVersionsService,
+                    useValue: versions,
+                },
+            ],
+        }).compile();
+        const firebaseService = module.get(FilesService);
+
+        const file = await firebaseService.upload(
+            ctx('user-1'),
+            multerFile(),
+            {},
+        );
+        expect(file.storageProvider).toBe(FileStorageProvider.FIREBASE);
     });
 
     it('rejects missing file', async () => {
@@ -255,5 +303,58 @@ describe('FilesService', () => {
 
         expect(storage.delete).toHaveBeenCalledWith('key');
         expect(repository.remove).toHaveBeenCalledWith(existing);
+    });
+
+    it('builds local download URL when FILE_PUBLIC_BASE_URL is set', async () => {
+        publicBaseUrl = 'https://api.example.com';
+        const module = await Test.createTestingModule({
+            providers: [
+                FilesService,
+                {
+                    provide: getRepositoryToken(UploadedFile),
+                    useValue: repository,
+                },
+                {
+                    provide: FILE_STORAGE,
+                    useValue: storage,
+                },
+                {
+                    provide: ConfigService,
+                    useValue: {
+                        get: jest.fn(
+                            (key: string, fallback?: unknown): unknown => {
+                                const values: Record<string, unknown> = {
+                                    FILE_STORAGE_DRIVER: 'local',
+                                    FILE_MAX_SIZE_BYTES: 100,
+                                    FILE_PUBLIC_BASE_URL: publicBaseUrl,
+                                };
+                                return values[key] ?? fallback;
+                            },
+                        ),
+                    },
+                },
+                {
+                    provide: SurveyVersionsService,
+                    useValue: versions,
+                },
+            ],
+        }).compile();
+        const localService = module.get(FilesService);
+
+        const response = localService.toResponse({
+            id: 'file-1',
+            createdBy: 'user-1',
+            originalName: 'report.pdf',
+            mimeType: 'application/pdf',
+            size: 5,
+            storageProvider: FileStorageProvider.LOCAL,
+            storageKey: 'ignored',
+            bucket: null,
+            url: null,
+            metadata: {},
+            createdAt: new Date(),
+        } as UploadedFile);
+
+        expect(response.url).toBe('https://api.example.com/files/file-1');
     });
 });

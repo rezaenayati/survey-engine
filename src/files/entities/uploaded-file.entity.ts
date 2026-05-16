@@ -9,6 +9,7 @@ import {
 export enum FileStorageProvider {
     LOCAL = 'local',
     S3 = 's3',
+    FIREBASE = 'firebase',
 }
 
 @Entity('uploaded_files')
@@ -38,7 +39,7 @@ export class UploadedFile {
     })
     storageProvider: FileStorageProvider;
 
-    /** Local relative path or S3 object key. */
+    /** Local relative path or object key for cloud providers. */
     @Column({ type: 'varchar', length: 1024 })
     storageKey: string;
 

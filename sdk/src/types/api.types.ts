@@ -80,7 +80,7 @@ export interface SurveyResponse {
     completedAt: string | null;
 }
 
-export type FileStorageProvider = 'local' | 's3';
+export type FileStorageProvider = 'local' | 's3' | 'firebase';
 
 export interface UploadedFile {
     id: string;

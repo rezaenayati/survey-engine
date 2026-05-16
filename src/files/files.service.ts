@@ -51,7 +51,9 @@ export class FilesService {
         this.provider =
             this.config.get<string>('FILE_STORAGE_DRIVER') === 's3'
                 ? FileStorageProvider.S3
-                : FileStorageProvider.LOCAL;
+                : this.config.get<string>('FILE_STORAGE_DRIVER') === 'firebase'
+                  ? FileStorageProvider.FIREBASE
+                  : FileStorageProvider.LOCAL;
         this.maxFileSizeBytes = this.config.get<number>(
             'FILE_MAX_SIZE_BYTES',
             25 * 1024 * 1024,

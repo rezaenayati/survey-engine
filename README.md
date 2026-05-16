@@ -233,7 +233,7 @@ await surveyEngine.responses.update(response.id, {
 });
 ```
 
-By default files are stored on local disk under `uploads/`. Set `FILE_STORAGE_DRIVER=s3` and the S3 variables below to store objects in S3-compatible storage.
+By default files are stored on local disk under `uploads/`. Set `FILE_STORAGE_DRIVER=s3` for S3-compatible object storage, or `FILE_STORAGE_DRIVER=firebase` for Firebase Storage.
 
 ---
 
@@ -388,30 +388,35 @@ Conditional logic (`visibleIf`, `enableIf`, `requiredIf`) embedded directly in t
 
 ## Environment Variables
 
-| Variable               | Default         | Description                                                                      |
-| ---------------------- | --------------- | -------------------------------------------------------------------------------- |
-| `DB_HOST`              | `localhost`     | PostgreSQL host                                                                  |
-| `DB_PORT`              | `5432`          | PostgreSQL port                                                                  |
-| `DB_USER`              | `postgres`      | PostgreSQL user                                                                  |
-| `DB_PASSWORD`          | `postgres`      | PostgreSQL password                                                              |
-| `DB_NAME`              | `survey_engine` | PostgreSQL database                                                              |
-| `NODE_ENV`             | `development`   | `production` disables synchronize, enables migrations                            |
-| `PORT`                 | `3000`          | HTTP listen port                                                                 |
-| `CORS_ORIGINS`         | `*`             | Comma-separated allowed origins                                                  |
-| `API_KEY`              | _(unset)_       | Optional global API key                                                          |
-| `WEBHOOK_SECRET`       | _(unset)_       | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
-| `FILE_STORAGE_DRIVER`  | `local`         | File storage driver: `local` or `s3`                                             |
-| `FILE_LOCAL_DIR`       | `uploads`       | Local storage directory relative to the process working directory                |
-| `FILE_MAX_SIZE_BYTES`  | `26214400`      | Global upload cap before question-level validation                               |
-| `FILE_PUBLIC_BASE_URL` | _(unset)_       | Optional public base URL for locally stored files                                |
-| `S3_BUCKET`            | _(unset)_       | Required when `FILE_STORAGE_DRIVER=s3`                                           |
-| `S3_REGION`            | `us-east-1`     | S3 region                                                                        |
-| `S3_ENDPOINT`          | _(unset)_       | Optional S3-compatible endpoint (MinIO, R2, etc.)                                |
-| `S3_FORCE_PATH_STYLE`  | `false`         | Set `true` for MinIO/path-style providers                                        |
-| `S3_PUBLIC_BASE_URL`   | _(unset)_       | Optional public CDN/base URL for S3 objects                                      |
-| `THROTTLE_LIMIT`       | `100`           | Max requests per window per IP                                                   |
-| `THROTTLE_TTL`         | `60`            | Rate-limit window in seconds                                                     |
-| `LOG_LEVEL`            | `info`          | `trace` / `debug` / `info` / `warn` / `error`                                    |
+| Variable                   | Default         | Description                                                                      |
+| -------------------------- | --------------- | -------------------------------------------------------------------------------- |
+| `DB_HOST`                  | `localhost`     | PostgreSQL host                                                                  |
+| `DB_PORT`                  | `5432`          | PostgreSQL port                                                                  |
+| `DB_USER`                  | `postgres`      | PostgreSQL user                                                                  |
+| `DB_PASSWORD`              | `postgres`      | PostgreSQL password                                                              |
+| `DB_NAME`                  | `survey_engine` | PostgreSQL database                                                              |
+| `NODE_ENV`                 | `development`   | `production` disables synchronize, enables migrations                            |
+| `PORT`                     | `3000`          | HTTP listen port                                                                 |
+| `CORS_ORIGINS`             | `*`             | Comma-separated allowed origins                                                  |
+| `API_KEY`                  | _(unset)_       | Optional global API key                                                          |
+| `WEBHOOK_SECRET`           | _(unset)_       | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
+| `FILE_STORAGE_DRIVER`      | `local`         | File storage driver: `local`, `s3`, or `firebase`                                |
+| `FILE_LOCAL_DIR`           | `uploads`       | Local storage directory relative to the process working directory                |
+| `FILE_MAX_SIZE_BYTES`      | `26214400`      | Global upload cap before question-level validation                               |
+| `FILE_PUBLIC_BASE_URL`     | _(unset)_       | Optional public base URL for locally stored files                                |
+| `S3_BUCKET`                | _(unset)_       | Required when `FILE_STORAGE_DRIVER=s3`                                           |
+| `S3_REGION`                | `us-east-1`     | S3 region                                                                        |
+| `S3_ENDPOINT`              | _(unset)_       | Optional S3-compatible endpoint (MinIO, R2, etc.)                                |
+| `S3_FORCE_PATH_STYLE`      | `false`         | Set `true` for MinIO/path-style providers                                        |
+| `S3_PUBLIC_BASE_URL`       | _(unset)_       | Optional public CDN/base URL for S3 objects                                      |
+| `FIREBASE_STORAGE_BUCKET`  | _(unset)_       | Required when `FILE_STORAGE_DRIVER=firebase` (e.g. `your-project.appspot.com`)   |
+| `FIREBASE_PROJECT_ID`      | _(unset)_       | Optional explicit Firebase project ID                                            |
+| `FIREBASE_CLIENT_EMAIL`    | _(unset)_       | Optional service account client email (used with private key)                    |
+| `FIREBASE_PRIVATE_KEY`     | _(unset)_       | Optional service account private key (`\\n` escaped newlines supported)          |
+| `FIREBASE_PUBLIC_BASE_URL` | _(unset)_       | Optional public CDN/base URL for Firebase objects                                |
+| `THROTTLE_LIMIT`           | `100`           | Max requests per window per IP                                                   |
+| `THROTTLE_TTL`             | `60`            | Rate-limit window in seconds                                                     |
+| `LOG_LEVEL`                | `info`          | `trace` / `debug` / `info` / `warn` / `error`                                    |
 
 ---
 
