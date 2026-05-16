@@ -227,9 +227,28 @@ class SurveysClient extends BaseClient {
 // ─── Responses client ─────────────────────────────────────────────────────────
 
 class ResponsesClient extends BaseClient {
-    /** Start a new response session (canonical route) */
-    start(input: StartResponseInput): Promise<SurveyResponse> {
-        return this.request('POST', '/responses', input);
+    /**
+     * Start a new response session. Posts to the canonical `/responses` route
+     * and falls back to the deprecated `/responses/start` if the server returns
+     * 404 — so the SDK works against both pre- and post-route-rename backends.
+     */
+    async start(input: StartResponseInput): Promise<SurveyResponse> {
+        try {
+            return await this.request<SurveyResponse>(
+                'POST',
+                '/responses',
+                input,
+            );
+        } catch (err) {
+            if (err instanceof SurveyEngineError && err.status === 404) {
+                return this.request<SurveyResponse>(
+                    'POST',
+                    '/responses/start',
+                    input,
+                );
+            }
+            throw err;
+        }
     }
 
     list(query?: ListResponsesQuery): Promise<PaginatedResult<SurveyResponse>> {
