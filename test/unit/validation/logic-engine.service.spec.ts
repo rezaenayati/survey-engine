@@ -286,6 +286,100 @@ describe('LogicEngineService', () => {
             );
         });
 
+        describe('string case-sensitivity (default = case-sensitive)', () => {
+            const withCaseFlag = (
+                op: ComparisonOperator,
+                condVal: unknown,
+                answer: unknown,
+                caseSensitiveStringComparison?: boolean,
+            ) => {
+                const logic = visibilityRule('q1', op, condVal, 'q2');
+                if (caseSensitiveStringComparison !== undefined) {
+                    logic.globalSettings = { caseSensitiveStringComparison };
+                }
+                return service
+                    .evaluateLogic(baseSchema, logic, { q1: answer })
+                    .hiddenQuestions.includes('q2');
+            };
+
+            it('EQUALS is case-sensitive by default — "Yes" !== "yes"', () => {
+                expect(
+                    withCaseFlag(ComparisonOperator.EQUALS, 'Yes', 'yes'),
+                ).toBe(false);
+                expect(
+                    withCaseFlag(ComparisonOperator.EQUALS, 'Yes', 'Yes'),
+                ).toBe(true);
+            });
+
+            it('CONTAINS is case-sensitive by default — "World" not in "hello world"', () => {
+                expect(
+                    withCaseFlag(
+                        ComparisonOperator.CONTAINS,
+                        'World',
+                        'hello world',
+                    ),
+                ).toBe(false);
+                expect(
+                    withCaseFlag(
+                        ComparisonOperator.CONTAINS,
+                        'world',
+                        'hello world',
+                    ),
+                ).toBe(true);
+            });
+
+            it('EQUALS becomes case-insensitive with caseSensitiveStringComparison=false', () => {
+                expect(
+                    withCaseFlag(
+                        ComparisonOperator.EQUALS,
+                        'Yes',
+                        'yes',
+                        false,
+                    ),
+                ).toBe(true);
+            });
+
+            it('CONTAINS becomes case-insensitive with caseSensitiveStringComparison=false', () => {
+                expect(
+                    withCaseFlag(
+                        ComparisonOperator.CONTAINS,
+                        'World',
+                        'hello world',
+                        false,
+                    ),
+                ).toBe(true);
+            });
+
+            it('explicit caseSensitiveStringComparison=true matches the default', () => {
+                expect(
+                    withCaseFlag(ComparisonOperator.EQUALS, 'Yes', 'yes', true),
+                ).toBe(false);
+            });
+
+            it('does not affect numeric or array equality (no string surface)', () => {
+                // Numbers: case flag is irrelevant.
+                expect(withCaseFlag(ComparisonOperator.EQUALS, 5, 5)).toBe(
+                    true,
+                );
+                expect(
+                    withCaseFlag(ComparisonOperator.EQUALS, 5, 5, false),
+                ).toBe(true);
+
+                // Array-of-strings: still respects the flag for element equality.
+                expect(
+                    withCaseFlag(ComparisonOperator.EQUALS, ['Yes'], ['yes']),
+                ).toBe(false);
+                expect(
+                    withCaseFlag(
+                        ComparisonOperator.EQUALS,
+                        ['Yes'],
+                        ['yes'],
+                        false,
+                    ),
+                ).toBe(true);
+            });
+        });
+
         it('IS_EMPTY — undefined answer', () => {
             expect(
                 hide(ComparisonOperator.IS_EMPTY, undefined, undefined),

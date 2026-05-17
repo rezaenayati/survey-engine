@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Logic engine
 
+- **⚠️ Breaking: string equality is now case-sensitive by default.** The `EQUALS` and
+  `CONTAINS` operators previously lower-cased both sides before comparing — so
+  `"Yes" === "yes"` and `"World" CONTAINS "world"` evaluated true. This was inconsistent
+  with `STARTS_WITH`/`ENDS_WITH`/`MATCHES` (which were already case-sensitive) and could
+  mask real bugs.
+
+  To restore the previous behaviour for a survey, set
+  `logicJson.globalSettings.caseSensitiveStringComparison = false`. Existing surveys whose
+  rules happened to match by case-insensitive luck will start producing different results
+  on upgrade — review your conditions or set the flag.
+
 - **`CALCULATED` rule expression evaluation** — calculated field rules now evaluate their
   `expression` string instead of storing it raw. Supported syntax:
   - `{questionId}` substitution from current answers

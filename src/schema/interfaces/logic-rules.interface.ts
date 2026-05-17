@@ -100,6 +100,12 @@ export interface LogicSchema {
 export interface LogicGlobalSettings {
     evaluateOnChange?: boolean; // Re-evaluate on every answer change
     strictMode?: boolean; // Fail on undefined question references
+    /**
+     * Controls string equality and substring matching. Default `true` (case-sensitive).
+     * Set `false` to restore the pre-1.x behavior where `"Yes" === "yes"` and
+     * `"World" CONTAINS "world"` evaluated true.
+     */
+    caseSensitiveStringComparison?: boolean;
 }
 
 /**

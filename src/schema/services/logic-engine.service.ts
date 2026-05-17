@@ -79,6 +79,11 @@ export class LogicEngineService {
             (a, b) => (b.priority || 0) - (a.priority || 0),
         );
 
+        // String comparison defaults to case-sensitive; opt back into the older
+        // case-insensitive behavior via `globalSettings.caseSensitiveStringComparison`.
+        const caseSensitive =
+            logicSchema.globalSettings?.caseSensitiveStringComparison !== false;
+
         // Evaluate each rule
         for (const rule of sortedRules) {
             if (rule.enabled === false) {
@@ -89,6 +94,7 @@ export class LogicEngineService {
                 rule,
                 answers,
                 logicSchema.globalSettings?.strictMode,
+                caseSensitive,
             );
             result.ruleResults.push(ruleResult);
 
@@ -115,12 +121,14 @@ export class LogicEngineService {
         rule: LogicRule,
         answers: Record<string, unknown>,
         strictMode?: boolean,
+        caseSensitive: boolean = true,
     ): RuleEvaluationResult {
         try {
             const conditionMet = this.evaluateCondition(
                 rule.condition,
                 answers,
                 strictMode,
+                caseSensitive,
             );
 
             return {
@@ -144,12 +152,23 @@ export class LogicEngineService {
         condition: Condition | ConditionGroup,
         answers: Record<string, unknown>,
         strictMode?: boolean,
+        caseSensitive: boolean = true,
     ): boolean {
         if (isConditionGroup(condition)) {
-            return this.evaluateConditionGroup(condition, answers, strictMode);
+            return this.evaluateConditionGroup(
+                condition,
+                answers,
+                strictMode,
+                caseSensitive,
+            );
         }
 
-        return this.evaluateSingleCondition(condition, answers, strictMode);
+        return this.evaluateSingleCondition(
+            condition,
+            answers,
+            strictMode,
+            caseSensitive,
+        );
     }
 
     /**
@@ -159,13 +178,14 @@ export class LogicEngineService {
         group: ConditionGroup,
         answers: Record<string, unknown>,
         strictMode?: boolean,
+        caseSensitive: boolean = true,
     ): boolean {
         if (!group.conditions || group.conditions.length === 0) {
             return true;
         }
 
         const results = group.conditions.map((c) =>
-            this.evaluateCondition(c, answers, strictMode),
+            this.evaluateCondition(c, answers, strictMode, caseSensitive),
         );
 
         if (group.operator === LogicalOperator.AND) {
@@ -182,6 +202,7 @@ export class LogicEngineService {
         condition: Condition,
         answers: Record<string, unknown>,
         strictMode?: boolean,
+        caseSensitive: boolean = true,
     ): boolean {
         const answer = answers[condition.questionId];
 
@@ -192,7 +213,12 @@ export class LogicEngineService {
             );
         }
 
-        return this.compareValues(answer, condition.operator, condition.value);
+        return this.compareValues(
+            answer,
+            condition.operator,
+            condition.value,
+            caseSensitive,
+        );
     }
 
     /**
@@ -202,6 +228,7 @@ export class LogicEngineService {
         answer: unknown,
         operator: ComparisonOperator,
         conditionValue: unknown,
+        caseSensitive: boolean = true,
     ): boolean {
         // Handle empty checks first
         if (operator === ComparisonOperator.IS_EMPTY) {
@@ -217,10 +244,10 @@ export class LogicEngineService {
 
         switch (operator) {
             case ComparisonOperator.EQUALS:
-                return this.equals(answerValue, compareValue);
+                return this.equals(answerValue, compareValue, caseSensitive);
 
             case ComparisonOperator.NOT_EQUALS:
-                return !this.equals(answerValue, compareValue);
+                return !this.equals(answerValue, compareValue, caseSensitive);
 
             case ComparisonOperator.GREATER_THAN:
                 return this.toNumber(answerValue) > this.toNumber(compareValue);
@@ -239,10 +266,10 @@ export class LogicEngineService {
                 );
 
             case ComparisonOperator.CONTAINS:
-                return this.contains(answerValue, compareValue);
+                return this.contains(answerValue, compareValue, caseSensitive);
 
             case ComparisonOperator.NOT_CONTAINS:
-                return !this.contains(answerValue, compareValue);
+                return !this.contains(answerValue, compareValue, caseSensitive);
 
             case ComparisonOperator.STARTS_WITH:
                 return this.toStr(answerValue).startsWith(
@@ -294,15 +321,24 @@ export class LogicEngineService {
     }
 
     /**
-     * Check equality (handles arrays and objects)
+     * Check equality (handles arrays and objects).
+     *
+     * Strings are compared case-sensitively by default; pass `caseSensitive: false`
+     * to fold both sides to lower-case before comparing.
      */
-    private equals(a: unknown, b: unknown): boolean {
+    private equals(
+        a: unknown,
+        b: unknown,
+        caseSensitive: boolean = true,
+    ): boolean {
         if (a === b) return true;
 
         // Handle array comparison
         if (Array.isArray(a) && Array.isArray(b)) {
             if (a.length !== b.length) return false;
-            return a.every((val, idx) => this.equals(val, b[idx]));
+            return a.every((val, idx) =>
+                this.equals(val, b[idx], caseSensitive),
+            );
         }
 
         // Handle object comparison
@@ -319,13 +355,16 @@ export class LogicEngineService {
                 this.equals(
                     (a as Record<string, unknown>)[key],
                     (b as Record<string, unknown>)[key],
+                    caseSensitive,
                 ),
             );
         }
 
-        // String comparison (case-insensitive for strings)
+        // String comparison
         if (typeof a === 'string' && typeof b === 'string') {
-            return a.toLowerCase() === b.toLowerCase();
+            return caseSensitive
+                ? a === b
+                : a.toLowerCase() === b.toLowerCase();
         }
 
         // Number comparison
@@ -349,16 +388,27 @@ export class LogicEngineService {
     }
 
     /**
-     * Check if value contains another value
+     * Check if value contains another value.
+     *
+     * For string haystacks, substring search is case-sensitive by default;
+     * pass `caseSensitive: false` to match the previous lowercase behaviour.
      */
-    private contains(haystack: unknown, needle: unknown): boolean {
+    private contains(
+        haystack: unknown,
+        needle: unknown,
+        caseSensitive: boolean = true,
+    ): boolean {
         if (Array.isArray(haystack)) {
-            return haystack.some((item) => this.equals(item, needle));
+            return haystack.some((item) =>
+                this.equals(item, needle, caseSensitive),
+            );
         }
         if (typeof haystack === 'string') {
-            return haystack
-                .toLowerCase()
-                .includes(this.toStr(needle).toLowerCase());
+            const hayStr = this.toStr(haystack);
+            const needleStr = this.toStr(needle);
+            return caseSensitive
+                ? hayStr.includes(needleStr)
+                : hayStr.toLowerCase().includes(needleStr.toLowerCase());
         }
         return false;
     }
