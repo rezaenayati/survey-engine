@@ -1,6 +1,11 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
 import { ResponsesService } from '../../../src/responses/responses.service';
 import { Response } from '../../../src/responses/entities/response.entity';
 import { SurveyVersion } from '../../../src/surveys/entities/survey-version.entity';
@@ -11,6 +16,14 @@ import { ResponseValidatorService } from '../../../src/schema/services/response-
 import { WebhookService } from '../../../src/webhooks/webhook.service';
 import { ResponseStatus } from '../../../src/common/constants/status.constants';
 import type { RequestContext } from '../../../src/common/interfaces/request-context.interface';
+
+/** ConfigService stub — `get(key)` returns env[key] or undefined. */
+function configStub(env: Record<string, string> = {}) {
+    return {
+        provide: ConfigService,
+        useValue: { get: (key: string) => env[key] },
+    };
+}
 
 const ctx: RequestContext = { userId: 'user-1', correlationId: 'corr-1' };
 
@@ -46,7 +59,11 @@ describe('ResponsesService', () => {
     let service: ResponsesService;
     let responseRepo: ReturnType<typeof makeResponseRepo>;
     let versionRepo: { findOne: jest.Mock };
-    let surveysService: { getRuntime: jest.Mock; findOne: jest.Mock };
+    let surveysService: {
+        getRuntime: jest.Mock;
+        findOne: jest.Mock;
+        assertOwner: jest.Mock;
+    };
 
     beforeEach(async () => {
         responseRepo = makeResponseRepo();
@@ -57,6 +74,18 @@ describe('ResponsesService', () => {
                 id: 's1',
                 settings: {},
                 activeVersionId: 'version-1',
+            }),
+            // Real assertOwner enforces the hybrid policy; mirror it in the stub
+            // so findAll's ownership delegation is exercised end-to-end.
+            assertOwner: jest.fn((survey, ctx) => {
+                if (
+                    survey.createdBy &&
+                    (!ctx.userId || survey.createdBy !== ctx.userId)
+                ) {
+                    throw new ForbiddenException(
+                        'You do not have access to this survey',
+                    );
+                }
             }),
         };
 
@@ -76,6 +105,7 @@ describe('ResponsesService', () => {
                 },
                 { provide: SurveysService, useValue: surveysService },
                 { provide: WebhookService, useValue: { fire: jest.fn() } },
+                configStub(),
             ],
         }).compile();
 
@@ -122,14 +152,80 @@ describe('ResponsesService', () => {
     // ──────────────────────────────────────────────────────────────────────────
 
     describe('findOne', () => {
-        it('returns response when found', async () => {
+        it('returns response when caller is the respondent', async () => {
             const response = {
                 id: 'r1',
                 surveyId: 's1',
+                respondentId: 'user-1',
                 status: ResponseStatus.STARTED,
             };
             responseRepo.findOne.mockResolvedValue(response);
             expect(await service.findOne(ctx, 'r1')).toBe(response);
+        });
+
+        it('returns response when caller owns the survey', async () => {
+            const response = {
+                id: 'r1',
+                surveyId: 's1',
+                respondentId: 'other-user',
+                status: ResponseStatus.STARTED,
+            };
+            responseRepo.findOne.mockResolvedValue(response);
+            surveysService.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'user-1',
+                settings: {},
+            });
+            expect(await service.findOne(ctx, 'r1')).toBe(response);
+        });
+
+        it('returns anonymous responses to any caller (resume-token pattern)', async () => {
+            const response = {
+                id: 'r1',
+                surveyId: 's1',
+                respondentId: null,
+                status: ResponseStatus.STARTED,
+            };
+            responseRepo.findOne.mockResolvedValue(response);
+            expect(await service.findOne({ correlationId: 'c' }, 'r1')).toBe(
+                response,
+            );
+        });
+
+        it('forbids an anonymous caller from reading an identified response', async () => {
+            const response = {
+                id: 'r1',
+                surveyId: 's1',
+                respondentId: 'alice',
+                status: ResponseStatus.STARTED,
+            };
+            responseRepo.findOne.mockResolvedValue(response);
+            // Survey is also identified and not owned by the caller (no caller).
+            surveysService.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'alice',
+                settings: {},
+            });
+            await expect(
+                service.findOne({ correlationId: 'c' }, 'r1'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it('forbids a third party from reading an identified response', async () => {
+            responseRepo.findOne.mockResolvedValue({
+                id: 'r1',
+                surveyId: 's1',
+                respondentId: 'alice',
+                status: ResponseStatus.STARTED,
+            });
+            surveysService.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'alice',
+                settings: {},
+            });
+            await expect(service.findOne(ctx, 'r1')).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
         });
 
         it('throws NotFoundException when not found', async () => {
@@ -178,6 +274,69 @@ describe('ResponsesService', () => {
             await expect(
                 service.update(ctx, 'r1', { answersJson: {} }),
             ).rejects.toBeInstanceOf(BadRequestException);
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // STRICT_AUTH=true: anonymous responses are immutable
+    // ──────────────────────────────────────────────────────────────────────────
+
+    describe('mutation under STRICT_AUTH=true', () => {
+        let strictService: ResponsesService;
+
+        beforeEach(async () => {
+            const m = await Test.createTestingModule({
+                providers: [
+                    ResponsesService,
+                    SchemaValidatorService,
+                    LogicEngineService,
+                    ResponseValidatorService,
+                    {
+                        provide: getRepositoryToken(Response),
+                        useValue: responseRepo,
+                    },
+                    {
+                        provide: getRepositoryToken(SurveyVersion),
+                        useValue: versionRepo,
+                    },
+                    { provide: SurveysService, useValue: surveysService },
+                    { provide: WebhookService, useValue: { fire: jest.fn() } },
+                    configStub({ STRICT_AUTH: 'true' }),
+                ],
+            }).compile();
+            strictService = m.get(ResponsesService);
+        });
+
+        it('forbids any caller from updating an anonymous response', async () => {
+            responseRepo.findOne.mockResolvedValue({
+                id: 'r1',
+                status: ResponseStatus.IN_PROGRESS,
+                respondentId: null,
+                answersJson: {},
+                metadata: {},
+            });
+            await expect(
+                strictService.update(ctx, 'r1', { answersJson: { q1: 'x' } }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it('still allows the owner to update their identified response', async () => {
+            const existing = {
+                id: 'r1',
+                status: ResponseStatus.IN_PROGRESS,
+                respondentId: 'user-1',
+                answersJson: {},
+                metadata: {},
+            };
+            responseRepo.findOne.mockResolvedValue(existing);
+            responseRepo.save.mockResolvedValue({
+                ...existing,
+                answersJson: { q1: 'x' },
+            });
+            const result = await strictService.update(ctx, 'r1', {
+                answersJson: { q1: 'x' },
+            });
+            expect(result.id).toBe('r1');
         });
     });
 
@@ -231,6 +390,9 @@ describe('ResponsesService', () => {
         });
 
         it('throws ForbiddenException when a different user tries to complete', async () => {
+            // Identified response owned by other-user; calling caller is user-1,
+            // and they don't own the survey either (mocked survey has no createdBy).
+            // findOne refuses non-respondent / non-survey-owner access.
             responseRepo.findOne.mockResolvedValue({
                 id: 'r1',
                 status: ResponseStatus.IN_PROGRESS,
@@ -239,8 +401,8 @@ describe('ResponsesService', () => {
                 surveyId: 's1',
                 answersJson: {},
             });
-            await expect(service.complete(ctx, 'r1')).rejects.toThrow(
-                'Only the original respondent',
+            await expect(service.complete(ctx, 'r1')).rejects.toBeInstanceOf(
+                ForbiddenException,
             );
         });
     });
@@ -460,29 +622,25 @@ describe('ResponsesService', () => {
             const { getRepositoryToken: grt } = await import('@nestjs/typeorm');
 
             const localRepoR = makeResponseRepo({
-                save: jest
-                    .fn()
-                    .mockResolvedValue({
-                        id: 'r2',
-                        surveyId: 's1',
-                        respondentId: 'user-1',
-                        answersJson: {},
-                    }),
+                save: jest.fn().mockResolvedValue({
+                    id: 'r2',
+                    surveyId: 's1',
+                    respondentId: 'user-1',
+                    answersJson: {},
+                }),
             });
             const localVR = {
                 findOne: jest.fn().mockResolvedValue(activeVersion),
             };
             const localSurveys = {
-                findOne: jest
-                    .fn()
-                    .mockResolvedValue({
-                        id: 's1',
-                        settings: {
-                            webhookUrl: 'http://x',
-                            webhookEvents: ['response.started'],
-                        },
-                        activeVersionId: 'version-1',
-                    }),
+                findOne: jest.fn().mockResolvedValue({
+                    id: 's1',
+                    settings: {
+                        webhookUrl: 'http://x',
+                        webhookEvents: ['response.started'],
+                    },
+                    activeVersionId: 'version-1',
+                }),
             };
 
             const m = await TestNest.createTestingModule({
@@ -495,6 +653,7 @@ describe('ResponsesService', () => {
                     { provide: grt(SurveyVersion), useValue: localVR },
                     { provide: SurveysService, useValue: localSurveys },
                     { provide: WebhookService, useValue: webhookService },
+                    configStub(),
                 ],
             }).compile();
 

@@ -1,12 +1,25 @@
 import { Test } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
 import { SurveysService } from '../../../src/surveys/surveys.service';
 import { Survey } from '../../../src/surveys/entities/survey.entity';
 import { SchemaValidatorService } from '../../../src/schema/services/schema-validator.service';
 import { LogicEngineService } from '../../../src/schema/services/logic-engine.service';
 import { SurveyStatus } from '../../../src/common/constants/status.constants';
 import type { RequestContext } from '../../../src/common/interfaces/request-context.interface';
+
+/** ConfigService stub — `get(key)` returns env[key] or undefined. */
+function configStub(env: Record<string, string> = {}) {
+    return {
+        provide: ConfigService,
+        useValue: { get: (key: string) => env[key] },
+    };
+}
 
 const ctx: RequestContext = { userId: 'user-1', correlationId: 'corr-1' };
 
@@ -52,6 +65,7 @@ describe('SurveysService', () => {
                 SchemaValidatorService,
                 LogicEngineService,
                 { provide: getRepositoryToken(Survey), useValue: surveyRepo },
+                configStub(),
             ],
         }).compile();
 
@@ -300,16 +314,134 @@ describe('SurveysService', () => {
             );
         });
 
-        it('does not throw when survey has no owner (ownerless resource)', () => {
+        it('does not throw when survey has no owner (default policy, STRICT_AUTH off)', () => {
             const survey = { id: 's1', createdBy: null } as never;
             expect(() => service.assertOwner(survey, ctx)).not.toThrow();
         });
 
-        it('does not throw when caller has no userId (anonymous)', () => {
+        it('throws when an anonymous caller tries to mutate an identified resource', () => {
             const survey = { id: 's1', createdBy: 'someone' } as never;
             expect(() =>
                 service.assertOwner(survey, { correlationId: 'c' }),
-            ).not.toThrow();
+            ).toThrow(ForbiddenException);
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // assertOwner under STRICT_AUTH=true
+    // ──────────────────────────────────────────────────────────────────────────
+
+    describe('assertOwner with STRICT_AUTH=true', () => {
+        let strictService: SurveysService;
+
+        beforeEach(async () => {
+            const module = await Test.createTestingModule({
+                providers: [
+                    SurveysService,
+                    SchemaValidatorService,
+                    LogicEngineService,
+                    {
+                        provide: getRepositoryToken(Survey),
+                        useValue: mockRepo(),
+                    },
+                    configStub({ STRICT_AUTH: 'true' }),
+                ],
+            }).compile();
+            strictService = module.get(SurveysService);
+        });
+
+        it('forbids mutating anonymous resources', () => {
+            const survey = { id: 's1', createdBy: null } as never;
+            expect(() => strictService.assertOwner(survey, ctx)).toThrow(
+                ForbiddenException,
+            );
+        });
+
+        it('still allows the owner', () => {
+            const survey = { id: 's1', createdBy: 'user-1' } as never;
+            expect(() => strictService.assertOwner(survey, ctx)).not.toThrow();
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // findOneVisible — controller-facing read with draft visibility filter
+    // ──────────────────────────────────────────────────────────────────────────
+
+    describe('findOneVisible', () => {
+        it('returns the survey when caller is the owner (any status)', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'user-1',
+                status: SurveyStatus.DRAFT,
+            });
+            const result = await service.findOneVisible(ctx, 's1');
+            expect(result.id).toBe('s1');
+        });
+
+        it('returns published surveys to non-owners', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'other-user',
+                status: SurveyStatus.PUBLISHED,
+            });
+            const result = await service.findOneVisible(ctx, 's1');
+            expect(result.id).toBe('s1');
+        });
+
+        it('hides drafts from non-owners (404, not 403, to avoid enumeration)', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'other-user',
+                status: SurveyStatus.DRAFT,
+            });
+            await expect(
+                service.findOneVisible(ctx, 's1'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('hides archived surveys from non-owners', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'other-user',
+                status: SurveyStatus.ARCHIVED,
+            });
+            await expect(
+                service.findOneVisible(ctx, 's1'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('returns anonymous-created surveys to any caller (any status)', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: null,
+                status: SurveyStatus.DRAFT,
+            });
+            const result = await service.findOneVisible(ctx, 's1');
+            expect(result.id).toBe('s1');
+        });
+
+        it('returns the survey to an anonymous caller when status is published', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'someone',
+                status: SurveyStatus.PUBLISHED,
+            });
+            const result = await service.findOneVisible(
+                { correlationId: 'c' },
+                's1',
+            );
+            expect(result.id).toBe('s1');
+        });
+
+        it('hides drafts from anonymous callers', async () => {
+            surveyRepo.findOne.mockResolvedValue({
+                id: 's1',
+                createdBy: 'someone',
+                status: SurveyStatus.DRAFT,
+            });
+            await expect(
+                service.findOneVisible({ correlationId: 'c' }, 's1'),
+            ).rejects.toBeInstanceOf(NotFoundException);
         });
     });
 
@@ -420,11 +552,23 @@ describe('SurveysService', () => {
             );
         });
 
-        it('sets createdBy to null for anonymous caller', async () => {
+        it('sets createdBy to null when an anonymous caller duplicates an anonymous original', async () => {
+            // An anonymous caller cannot duplicate someone else's identified survey
+            // (assertOwner forbids it), but an anonymous original is open to all.
+            surveyRepo.findOne.mockResolvedValue({
+                ...original,
+                createdBy: null,
+            });
             await service.duplicate({ correlationId: 'c' }, 'survey-1');
             expect(surveyRepo.create).toHaveBeenCalledWith(
                 expect.objectContaining({ createdBy: null }),
             );
+        });
+
+        it('forbids an anonymous caller from duplicating an identified survey', async () => {
+            await expect(
+                service.duplicate({ correlationId: 'c' }, 'survey-1'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it('handles null draftSchemaJson gracefully', async () => {

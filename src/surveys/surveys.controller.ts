@@ -59,12 +59,17 @@ export class SurveysController {
     @ApiOperation({ summary: 'Get a survey by ID' })
     @ApiParam({ name: 'id', description: 'Survey ID' })
     @ApiResponse({ status: 200, description: 'Survey found', type: SurveyDto })
-    @ApiResponse({ status: 404, description: 'Survey not found' })
+    @ApiResponse({
+        status: 404,
+        description:
+            'Survey not found, or the caller is not allowed to see this survey ' +
+            'in its current status (drafts/archived are visible only to their owner).',
+    })
     async findOne(
         @GetContext() ctx: RequestContext,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<SurveyDto> {
-        return this.surveysService.findOne(ctx, id);
+        return this.surveysService.findOneVisible(ctx, id);
     }
 
     @Patch(':id')

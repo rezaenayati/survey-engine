@@ -4,6 +4,7 @@ import {
     BadRequestException,
     ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Survey } from './entities/survey.entity';
@@ -20,25 +21,61 @@ import {
 
 @Injectable()
 export class SurveysService {
+    private readonly strictAuth: boolean;
+
     constructor(
         @InjectRepository(Survey)
         private readonly surveyRepository: Repository<Survey>,
         private readonly schemaValidator: SchemaValidatorService,
         private readonly logicEngine: LogicEngineService,
-    ) {}
+        private readonly config: ConfigService,
+    ) {
+        this.strictAuth = this.config.get<string>('STRICT_AUTH') === 'true';
+    }
 
     /**
-     * Throw 403 when a resource belongs to a specific user and the caller is a
-     * different user. Anonymous callers (no userId) and ownerless resources
-     * (no createdBy) are deliberately allowed so the service keeps working in
-     * deployments without an auth gateway.
+     * Ownership policy (Hybrid):
+     *
+     * - Identified resource (`createdBy` set): caller must match. Anonymous
+     *   callers and other users get 403.
+     * - Anonymous resource (`createdBy` null): mutable by anyone by default;
+     *   forbidden when `STRICT_AUTH=true` so deployers can opt out of allowing
+     *   bystander mutations.
      */
     assertOwner(survey: Survey, ctx: RequestContext): void {
-        if (survey.createdBy && ctx.userId && survey.createdBy !== ctx.userId) {
+        if (survey.createdBy) {
+            if (!ctx.userId || survey.createdBy !== ctx.userId) {
+                throw new ForbiddenException(
+                    'You do not have access to this survey',
+                );
+            }
+            return;
+        }
+
+        if (this.strictAuth) {
             throw new ForbiddenException(
-                'You do not have access to this survey',
+                'Mutating anonymous surveys is disabled in strict mode',
             );
         }
+    }
+
+    /**
+     * Caller-visible survey lookup. Drafts and archived surveys are visible
+     * only to their owner (or to anyone when the survey is anonymous); a
+     * non-owner asking for someone else's draft gets 404 — same response as
+     * for a non-existent ID, so the endpoint can't be used to enumerate
+     * draft surveys by UUID.
+     */
+    async findOneVisible(ctx: RequestContext, id: string): Promise<Survey> {
+        const survey = await this.findOne(ctx, id);
+        if (this.canSee(survey, ctx)) return survey;
+        throw new NotFoundException(`Survey with ID "${id}" not found`);
+    }
+
+    private canSee(survey: Survey, ctx: RequestContext): boolean {
+        if (!survey.createdBy) return true; // anonymous resource: open
+        if (survey.createdBy === ctx.userId) return true; // owner
+        return survey.status === SurveyStatus.PUBLISHED;
     }
 
     async create(ctx: RequestContext, dto: CreateSurveyDto): Promise<Survey> {

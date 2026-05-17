@@ -4,6 +4,7 @@ import {
     BadRequestException,
     ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Response } from './entities/response.entity';
@@ -27,6 +28,8 @@ import {
 
 @Injectable()
 export class ResponsesService {
+    private readonly strictAuth: boolean;
+
     constructor(
         @InjectRepository(Response)
         private readonly responseRepository: Repository<Response>,
@@ -36,7 +39,10 @@ export class ResponsesService {
         private readonly responseValidator: ResponseValidatorService,
         private readonly logicEngine: LogicEngineService,
         private readonly webhookService: WebhookService,
-    ) {}
+        private readonly config: ConfigService,
+    ) {
+        this.strictAuth = this.config.get<string>('STRICT_AUTH') === 'true';
+    }
 
     async start(ctx: RequestContext, dto: StartResponseDto): Promise<Response> {
         // Load survey once — used for both version resolution and webhook settings
@@ -94,17 +100,10 @@ export class ResponsesService {
 
         if (surveyId) {
             // When filtering by survey, verify the caller owns that survey so they
-            // can see all its responses (survey-owner view).
+            // can see all its responses (survey-owner view). The hybrid policy in
+            // assertOwner covers anonymous callers and STRICT_AUTH automatically.
             const survey = await this.surveysService.findOne(ctx, surveyId);
-            if (
-                survey.createdBy &&
-                ctx.userId &&
-                survey.createdBy !== ctx.userId
-            ) {
-                throw new ForbiddenException(
-                    "You do not have access to this survey's responses",
-                );
-            }
+            this.surveysService.assertOwner(survey, ctx);
             where.surveyId = surveyId;
         } else {
             // Without a surveyId, scope to the caller's own submitted responses
@@ -140,40 +139,45 @@ export class ResponsesService {
             throw new NotFoundException(`Response with ID "${id}" not found`);
         }
 
-        // Allow: respondent themselves, survey owner, or no-auth deployment
-        const isRespondent =
-            !response.respondentId ||
-            !ctx.userId ||
-            response.respondentId === ctx.userId;
-        if (!isRespondent) {
-            // Check if caller owns the survey this response belongs to
-            const survey = await this.surveysService.findOne(
-                ctx,
-                response.surveyId,
-            );
-            const isSurveyOwner =
-                !survey.createdBy ||
-                !ctx.userId ||
-                survey.createdBy === ctx.userId;
-            if (!isSurveyOwner) {
-                throw new ForbiddenException(
-                    'You do not have access to this response',
-                );
-            }
+        // Anonymous response: readable by anyone with the UUID (resume-token pattern).
+        if (!response.respondentId) return response;
+
+        // Identified response: caller must be the respondent...
+        if (response.respondentId === ctx.userId) return response;
+
+        // ...or the owner of the survey this response belongs to.
+        const survey = await this.surveysService.findOne(
+            ctx,
+            response.surveyId,
+        );
+        if (survey.createdBy && survey.createdBy === ctx.userId) {
+            return response;
         }
 
-        return response;
+        throw new ForbiddenException('You do not have access to this response');
     }
 
-    /** Ensure caller is the original respondent before mutating a response */
+    /**
+     * Respondent policy (Hybrid):
+     *
+     * - Identified response (`respondentId` set): caller must match. Anonymous
+     *   callers and other users get 403.
+     * - Anonymous response (`respondentId` null): mutable by anyone by default;
+     *   forbidden when `STRICT_AUTH=true`.
+     */
     private assertRespondent(response: Response, ctx: RequestContext): void {
-        if (
-            response.respondentId &&
-            ctx.userId &&
-            response.respondentId !== ctx.userId
-        ) {
+        if (response.respondentId) {
+            if (!ctx.userId || response.respondentId !== ctx.userId) {
+                throw new ForbiddenException(
+                    'Only the original respondent can modify this response',
+                );
+            }
+            return;
+        }
+
+        if (this.strictAuth) {
             throw new ForbiddenException(
-                'Only the original respondent can modify this response',
+                'Mutating anonymous responses is disabled in strict mode',
             );
         }
     }
