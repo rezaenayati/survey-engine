@@ -1,10 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
+import type { EntityManager } from 'typeorm';
 import {
     WebhookService,
     WebhookPayload,
 } from '../../../src/webhooks/webhook.service';
+import {
+    WebhookDelivery,
+    WebhookDeliveryStatus,
+} from '../../../src/webhooks/entities/webhook-delivery.entity';
 import type { SurveySettings } from '../../../src/surveys/entities/survey.entity';
 
 const samplePayload: WebhookPayload = {
@@ -15,6 +19,26 @@ const samplePayload: WebhookPayload = {
     respondentId: 'user-1',
     answersJson: { q1: 'answer' },
 };
+
+/** Minimal in-memory stand-in for an EntityManager. */
+function makeManager() {
+    const created: Partial<WebhookDelivery>[] = [];
+    const saved: Partial<WebhookDelivery>[] = [];
+    return {
+        created,
+        saved,
+        manager: {
+            create: jest.fn((_entity, data) => {
+                created.push(data);
+                return data;
+            }),
+            save: jest.fn(async (_entity, data) => {
+                saved.push(data);
+                return data;
+            }),
+        } as unknown as EntityManager,
+    };
+}
 
 function buildModule(webhookSecret?: string): Promise<TestingModule> {
     return Test.createTestingModule({
@@ -28,142 +52,95 @@ function buildModule(webhookSecret?: string): Promise<TestingModule> {
     }).compile();
 }
 
-describe('WebhookService', () => {
+describe('WebhookService.enqueue', () => {
     let service: WebhookService;
-    let fetchMock: jest.Mock;
 
     beforeEach(async () => {
-        fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200 });
-        global.fetch = fetchMock as unknown as typeof fetch;
-
         const module = await buildModule();
-        service = module.get<WebhookService>(WebhookService);
+        service = module.get(WebhookService);
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
+    it('does nothing when webhookUrl is not set', async () => {
+        const m = makeManager();
+        await service.enqueue(m.manager, {} as SurveySettings, samplePayload);
+        expect(m.saved).toHaveLength(0);
     });
 
-    describe('fire()', () => {
-        it('does nothing when webhookUrl is not set', async () => {
-            const settings: Partial<SurveySettings> = {};
-            service.fire(settings as SurveySettings, samplePayload);
-            await new Promise((r) => setTimeout(r, 10));
-            expect(fetchMock).not.toHaveBeenCalled();
-        });
-
-        it('fires a POST request to the configured URL', async () => {
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-            };
-            service.fire(settings as SurveySettings, samplePayload);
-            await new Promise((r) => setTimeout(r, 10));
-
-            expect(fetchMock).toHaveBeenCalledTimes(1);
-            const [url, options] = fetchMock.mock.calls[0] as [
-                string,
-                RequestInit,
-            ];
-            expect(url).toBe('https://example.com/hook');
-            expect(options.method).toBe('POST');
-            expect(JSON.parse(options.body as string)).toMatchObject({
-                event: 'response.completed',
-            });
-        });
-
-        it('sets X-Survey-Engine-Event and X-Survey-Engine-Delivery headers', async () => {
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-            };
-            service.fire(settings as SurveySettings, samplePayload);
-            await new Promise((r) => setTimeout(r, 10));
-
-            const [, options] = fetchMock.mock.calls[0] as [
-                string,
-                RequestInit,
-            ];
-            const headers = options.headers as Record<string, string>;
-            expect(headers['X-Survey-Engine-Event']).toBe('response.completed');
-            expect(headers['X-Survey-Engine-Delivery']).toBe('response-1');
-        });
-
-        it('signs payload with per-survey secret', async () => {
-            const secret = 'per-survey-secret';
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-                webhookSecret: secret,
-            };
-            service.fire(settings as SurveySettings, samplePayload);
-            await new Promise((r) => setTimeout(r, 10));
-
-            const [, options] = fetchMock.mock.calls[0] as [
-                string,
-                RequestInit,
-            ];
-            const body = options.body as string;
-            const headers = options.headers as Record<string, string>;
-            const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
-            expect(headers['X-Survey-Engine-Signature']).toBe(expected);
-        });
-
-        it('skips events not in webhookEvents filter', async () => {
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-                webhookEvents: ['response.started'], // only started, not completed
-            };
-            service.fire(settings as SurveySettings, samplePayload); // samplePayload is response.completed
-            await new Promise((r) => setTimeout(r, 10));
-            expect(fetchMock).not.toHaveBeenCalled();
-        });
-
-        it('delivers response.started event when included in webhookEvents', async () => {
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-                webhookEvents: ['response.started'],
-            };
-            service.fire(settings as SurveySettings, {
-                ...samplePayload,
-                event: 'response.started',
-            });
-            await new Promise((r) => setTimeout(r, 10));
-            expect(fetchMock).toHaveBeenCalledTimes(1);
-        });
-
-        it('sends no signature header when no secret is configured', async () => {
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-            };
-            service.fire(settings as SurveySettings, samplePayload);
-            await new Promise((r) => setTimeout(r, 10));
-
-            const [, options] = fetchMock.mock.calls[0] as [
-                string,
-                RequestInit,
-            ];
-            const headers = options.headers as Record<string, string>;
-            expect(headers['X-Survey-Engine-Signature']).toBeUndefined();
-        });
+    it('does nothing when the event is not in the allow-list', async () => {
+        const m = makeManager();
+        const settings: SurveySettings = {
+            allowAnonymous: true,
+            requireAuth: false,
+            accessTokenRequired: false,
+            webhookUrl: 'https://example.com/hook',
+            webhookEvents: ['response.started'],
+        };
+        await service.enqueue(m.manager, settings, samplePayload);
+        expect(m.saved).toHaveLength(0);
     });
 
-    describe('retry logic', () => {
-        it('retries on non-OK responses and ultimately gives up', async () => {
-            fetchMock.mockResolvedValue({ ok: false, status: 500 });
-            jest.useFakeTimers();
+    it('inserts a PENDING row with payload, url, and secret', async () => {
+        const m = makeManager();
+        const settings: SurveySettings = {
+            allowAnonymous: true,
+            requireAuth: false,
+            accessTokenRequired: false,
+            webhookUrl: 'https://example.com/hook',
+            webhookSecret: 'per-survey-secret',
+        };
+        await service.enqueue(m.manager, settings, samplePayload);
+        expect(m.saved).toHaveLength(1);
+        expect(m.saved[0]).toMatchObject({
+            event: 'response.completed',
+            surveyId: 'survey-1',
+            responseId: 'response-1',
+            url: 'https://example.com/hook',
+            secret: 'per-survey-secret',
+            payload: samplePayload,
+            status: WebhookDeliveryStatus.PENDING,
+            attempts: 0,
+        });
+        expect(m.saved[0].nextAttemptAt).toBeInstanceOf(Date);
+    });
 
-            const settings: Partial<SurveySettings> = {
-                webhookUrl: 'https://example.com/hook',
-            };
-            service.fire(settings as SurveySettings, samplePayload);
+    it('falls back to global WEBHOOK_SECRET when no per-survey secret is set', async () => {
+        const module = await buildModule('global-secret');
+        const svcWithGlobal = module.get<WebhookService>(WebhookService);
+        const m = makeManager();
+        const settings: SurveySettings = {
+            allowAnonymous: true,
+            requireAuth: false,
+            accessTokenRequired: false,
+            webhookUrl: 'https://example.com/hook',
+        };
+        await svcWithGlobal.enqueue(m.manager, settings, samplePayload);
+        expect(m.saved[0].secret).toBe('global-secret');
+    });
 
-            // Let delivery start and hit first failure
-            await Promise.resolve();
-            jest.runAllTimersAsync().catch(() => undefined);
+    it('stores secret=null when neither per-survey nor global is set', async () => {
+        const m = makeManager();
+        const settings: SurveySettings = {
+            allowAnonymous: true,
+            requireAuth: false,
+            accessTokenRequired: false,
+            webhookUrl: 'https://example.com/hook',
+        };
+        await service.enqueue(m.manager, settings, samplePayload);
+        expect(m.saved[0].secret).toBeNull();
+    });
 
-            // Restore real timers to flush all pending promises
-            jest.useRealTimers();
-            await new Promise((r) => setTimeout(r, 8000));
-
-            expect(fetchMock.mock.calls.length).toBe(3); // MAX_RETRIES
-        }, 15000);
+    it('defaults the event allow-list to all events when not provided', async () => {
+        const m = makeManager();
+        const settings: SurveySettings = {
+            allowAnonymous: true,
+            requireAuth: false,
+            accessTokenRequired: false,
+            webhookUrl: 'https://example.com/hook',
+        };
+        await service.enqueue(m.manager, settings, {
+            ...samplePayload,
+            event: 'response.started',
+        });
+        expect(m.saved).toHaveLength(1);
     });
 });

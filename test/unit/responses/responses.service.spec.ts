@@ -6,6 +6,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { ResponsesService } from '../../../src/responses/responses.service';
 import { Response } from '../../../src/responses/entities/response.entity';
 import { SurveyVersion } from '../../../src/surveys/entities/survey-version.entity';
@@ -22,6 +23,26 @@ function configStub(env: Record<string, string> = {}) {
     return {
         provide: ConfigService,
         useValue: { get: (key: string) => env[key] },
+    };
+}
+
+/**
+ * DataSource stub: invokes the transaction callback with a manager whose
+ * create/save delegate to the provided repository mock. Lets existing tests
+ * keep asserting against `responseRepo.save` / `responseRepo.create` after
+ * the service was rewrapped in `dataSource.transaction`.
+ */
+function dataSourceStub(responseRepo: { create: jest.Mock; save: jest.Mock }) {
+    const manager = {
+        create: (_entity: unknown, data: unknown) => responseRepo.create(data),
+        save: (_entity: unknown, data: unknown) => responseRepo.save(data),
+    };
+    return {
+        provide: DataSource,
+        useValue: {
+            transaction: <T>(cb: (m: typeof manager) => Promise<T>) =>
+                cb(manager),
+        },
     };
 }
 
@@ -104,8 +125,9 @@ describe('ResponsesService', () => {
                     useValue: versionRepo,
                 },
                 { provide: SurveysService, useValue: surveysService },
-                { provide: WebhookService, useValue: { fire: jest.fn() } },
+                { provide: WebhookService, useValue: { enqueue: jest.fn() } },
                 configStub(),
+                dataSourceStub(responseRepo as never),
             ],
         }).compile();
 
@@ -300,8 +322,12 @@ describe('ResponsesService', () => {
                         useValue: versionRepo,
                     },
                     { provide: SurveysService, useValue: surveysService },
-                    { provide: WebhookService, useValue: { fire: jest.fn() } },
+                    {
+                        provide: WebhookService,
+                        useValue: { enqueue: jest.fn() },
+                    },
                     configStub({ STRICT_AUTH: 'true' }),
+                    dataSourceStub(responseRepo as never),
                 ],
             }).compile();
             strictService = m.get(ResponsesService);
@@ -608,18 +634,8 @@ describe('ResponsesService', () => {
     // ──────────────────────────────────────────────────────────────────────────
 
     describe('start — webhook', () => {
-        it('fires response.started webhook after saving', async () => {
-            const webhookService = { fire: jest.fn() };
-
-            // Re-create module with captured webhookService
-            const { Test: TestNest } = await import('@nestjs/testing');
-            const { SchemaValidatorService } =
-                await import('../../../src/schema/services/schema-validator.service');
-            const { LogicEngineService } =
-                await import('../../../src/schema/services/logic-engine.service');
-            const { ResponseValidatorService } =
-                await import('../../../src/schema/services/response-validator.service');
-            const { getRepositoryToken: grt } = await import('@nestjs/typeorm');
+        it('enqueues response.started webhook inside the response transaction', async () => {
+            const webhookService = { enqueue: jest.fn() };
 
             const localRepoR = makeResponseRepo({
                 save: jest.fn().mockResolvedValue({
@@ -643,24 +659,33 @@ describe('ResponsesService', () => {
                 }),
             };
 
-            const m = await TestNest.createTestingModule({
+            const m = await Test.createTestingModule({
                 providers: [
                     ResponsesService,
                     SchemaValidatorService,
                     LogicEngineService,
                     ResponseValidatorService,
-                    { provide: grt(Response), useValue: localRepoR },
-                    { provide: grt(SurveyVersion), useValue: localVR },
+                    {
+                        provide: getRepositoryToken(Response),
+                        useValue: localRepoR,
+                    },
+                    {
+                        provide: getRepositoryToken(SurveyVersion),
+                        useValue: localVR,
+                    },
                     { provide: SurveysService, useValue: localSurveys },
                     { provide: WebhookService, useValue: webhookService },
                     configStub(),
+                    dataSourceStub(localRepoR as never),
                 ],
             }).compile();
 
             const svc = m.get(ResponsesService);
             await svc.start(ctx, { surveyId: 's1' });
 
-            expect(webhookService.fire).toHaveBeenCalledWith(
+            // First arg is the transactional manager (forwarded by dataSourceStub).
+            expect(webhookService.enqueue).toHaveBeenCalledWith(
+                expect.anything(),
                 expect.objectContaining({ webhookUrl: 'http://x' }),
                 expect.objectContaining({ event: 'response.started' }),
             );

@@ -5,8 +5,8 @@ import {
     ForbiddenException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Response } from './entities/response.entity';
 import { SurveyVersion } from '../surveys/entities/survey-version.entity';
 import { SurveysService } from '../surveys/surveys.service';
@@ -40,6 +40,7 @@ export class ResponsesService {
         private readonly logicEngine: LogicEngineService,
         private readonly webhookService: WebhookService,
         private readonly config: ConfigService,
+        @InjectDataSource() private readonly dataSource: DataSource,
     ) {
         this.strictAuth = this.config.get<string>('STRICT_AUTH') === 'true';
     }
@@ -60,24 +61,30 @@ export class ResponsesService {
             throw new NotFoundException('Active survey version not found');
         }
 
-        const response = this.responseRepository.create({
-            surveyId: dto.surveyId,
-            surveyVersionId: version.id,
-            respondentId: ctx.userId || null,
-            answersJson: dto.answersJson || {},
-            metadata: dto.metadata || {},
-            status: ResponseStatus.STARTED,
-        });
+        // Persist response + outbox row atomically. A crash between save and
+        // webhook enqueue would otherwise leave the response committed without
+        // a delivery record.
+        const saved = await this.dataSource.transaction(async (manager) => {
+            const draft = manager.create(Response, {
+                surveyId: dto.surveyId,
+                surveyVersionId: version.id,
+                respondentId: ctx.userId || null,
+                answersJson: dto.answersJson || {},
+                metadata: dto.metadata || {},
+                status: ResponseStatus.STARTED,
+            });
+            const persisted = await manager.save(Response, draft);
 
-        const saved = await this.responseRepository.save(response);
+            await this.webhookService.enqueue(manager, survey.settings, {
+                event: 'response.started',
+                timestamp: new Date().toISOString(),
+                surveyId: persisted.surveyId,
+                responseId: persisted.id,
+                respondentId: persisted.respondentId,
+                answersJson: persisted.answersJson,
+            });
 
-        this.webhookService.fire(survey.settings, {
-            event: 'response.started',
-            timestamp: new Date().toISOString(),
-            surveyId: saved.surveyId,
-            responseId: saved.id,
-            respondentId: saved.respondentId,
-            answersJson: saved.answersJson,
+            return persisted;
         });
 
         return saved;
@@ -260,20 +267,27 @@ export class ResponsesService {
         response.status = ResponseStatus.COMPLETED;
         response.completedAt = new Date();
 
-        const completed = await this.responseRepository.save(response);
-
-        // Fire response.completed webhook (non-blocking)
+        // Load survey settings *before* the transaction so the enqueue inside
+        // has everything it needs without spawning another query inside the tx.
         const survey = await this.surveysService.findOne(
             ctx,
-            completed.surveyId,
+            response.surveyId,
         );
-        this.webhookService.fire(survey.settings, {
-            event: 'response.completed',
-            timestamp: new Date().toISOString(),
-            surveyId: completed.surveyId,
-            responseId: completed.id,
-            respondentId: completed.respondentId,
-            answersJson: completed.answersJson,
+
+        // Commit completion + outbox row together.
+        const completed = await this.dataSource.transaction(async (manager) => {
+            const persisted = await manager.save(Response, response);
+
+            await this.webhookService.enqueue(manager, survey.settings, {
+                event: 'response.completed',
+                timestamp: new Date().toISOString(),
+                surveyId: persisted.surveyId,
+                responseId: persisted.id,
+                respondentId: persisted.respondentId,
+                answersJson: persisted.answersJson,
+            });
+
+            return persisted;
         });
 
         return completed;

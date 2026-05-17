@@ -2,6 +2,7 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { ApiKeyGuard } from './common/guards/api-key.guard';
 import { UserAuthGuard } from './common/guards/user-auth.guard';
@@ -81,6 +82,9 @@ import { FilesModule } from './files/files.module';
                 ],
             }),
         }),
+
+        // ScheduleModule powers the webhook dispatcher's poll loop.
+        ScheduleModule.forRoot(),
 
         SurveysModule,
         ResponsesModule,
