@@ -264,6 +264,23 @@ Health endpoints (`/health`, `/health/ready`) are always exempt.
 
 Leave `API_KEY` unset for deployments behind a trusted internal gateway.
 
+### Strict auth — refuse `X-User-ID` without an authenticated caller
+
+The default `X-User-ID` contract assumes a trusted gateway. If the engine is reachable
+from anything else, set `STRICT_AUTH=true` so that any request carrying `X-User-ID` must
+*also* pass the `API_KEY` check:
+
+```bash
+# .env
+API_KEY=change-me-in-production
+STRICT_AUTH=true
+```
+
+With this combination, a misconfigured deployment fails closed instead of silently
+allowing an attacker to set `X-User-ID: <victim>` and act as that user.
+
+See [`SECURITY.md`](SECURITY.md#trust-contract) for the full trust contract.
+
 ### Webhooks
 
 Receive real-time events when respondents start or complete a response.
@@ -399,6 +416,7 @@ Conditional logic (`visibleIf`, `enableIf`, `requiredIf`) embedded directly in t
 | `PORT`                     | `3000`          | HTTP listen port                                                                 |
 | `CORS_ORIGINS`             | `*`             | Comma-separated allowed origins                                                  |
 | `API_KEY`                  | _(unset)_       | Optional global API key                                                          |
+| `STRICT_AUTH`              | `false`         | When `true`, requests carrying `X-User-ID` must also pass the `API_KEY` check    |
 | `WEBHOOK_SECRET`           | _(unset)_       | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
 | `FILE_STORAGE_DRIVER`      | `local`         | File storage driver: `local`, `s3`, or `firebase`                                |
 | `FILE_LOCAL_DIR`           | `uploads`       | Local storage directory relative to the process working directory                |
