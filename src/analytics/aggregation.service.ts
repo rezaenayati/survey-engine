@@ -98,14 +98,15 @@ export class AggregationService {
         // Postgres allows FILTER on the PERCENTILE_CONT ordered-set aggregate, so
         // total/completed/avg/median fall out of one query — no separate subquery
         // and no regex rewriting of the QueryBuilder's generated SQL.
-        const completedFilter = `FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}' AND r.completedAt IS NOT NULL)`;
+        const completedFilter = `FILTER (WHERE r.status = :statusCompleted AND r.completedAt IS NOT NULL)`;
         const result = await qb
             .select([
                 'COUNT(*)::int as total',
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}')::int as completed`,
+                `COUNT(*) FILTER (WHERE r.status = :statusCompleted)::int as completed`,
                 `AVG(EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) ${completedFilter} as avg_time`,
                 `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) ${completedFilter} as median_time`,
             ])
+            .setParameters({ statusCompleted: ResponseStatus.COMPLETED })
             .getRawOne<SummaryRaw>();
 
         const statusCounts = await qb
@@ -167,13 +168,19 @@ export class AggregationService {
         const result = await qb
             .select([
                 'COUNT(*)::int as total',
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.STARTED}')::int as started`,
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.IN_PROGRESS}')::int as in_progress`,
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}')::int as completed`,
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.ABANDONED}')::int as abandoned`,
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.IN_PROGRESS}' AND r.updatedAt < :staleDate)::int as stale`,
+                `COUNT(*) FILTER (WHERE r.status = :statusStarted)::int as started`,
+                `COUNT(*) FILTER (WHERE r.status = :statusInProgress)::int as in_progress`,
+                `COUNT(*) FILTER (WHERE r.status = :statusCompleted)::int as completed`,
+                `COUNT(*) FILTER (WHERE r.status = :statusAbandoned)::int as abandoned`,
+                `COUNT(*) FILTER (WHERE r.status = :statusInProgress AND r.updatedAt < :staleDate)::int as stale`,
             ])
-            .setParameters({ staleDate })
+            .setParameters({
+                staleDate,
+                statusStarted: ResponseStatus.STARTED,
+                statusInProgress: ResponseStatus.IN_PROGRESS,
+                statusCompleted: ResponseStatus.COMPLETED,
+                statusAbandoned: ResponseStatus.ABANDONED,
+            })
             .getRawOne<FunnelRaw>();
 
         const total = parseInt(result.total, 10) || 0;
@@ -210,8 +217,9 @@ export class AggregationService {
             .select([
                 "TO_CHAR(r.startedAt, 'YYYY-MM-DD') as date",
                 'COUNT(*)::int as count',
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}')::int as completed`,
+                `COUNT(*) FILTER (WHERE r.status = :statusCompleted)::int as completed`,
             ])
+            .setParameters({ statusCompleted: ResponseStatus.COMPLETED })
             .groupBy("TO_CHAR(r.startedAt, 'YYYY-MM-DD')")
             .orderBy('date', 'ASC')
             .getRawMany<TrendRaw>();
@@ -221,8 +229,9 @@ export class AggregationService {
             .select([
                 "TO_CHAR(DATE_TRUNC('week', r.startedAt), 'YYYY-MM-DD') as date",
                 'COUNT(*)::int as count',
-                `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}')::int as completed`,
+                `COUNT(*) FILTER (WHERE r.status = :statusCompleted)::int as completed`,
             ])
+            .setParameters({ statusCompleted: ResponseStatus.COMPLETED })
             .groupBy("DATE_TRUNC('week', r.startedAt)")
             .orderBy('date', 'ASC')
             .getRawMany<TrendRaw>();
