@@ -441,7 +441,8 @@ Conditional logic (`visibleIf`, `enableIf`, `requiredIf`) embedded directly in t
 | `DB_USER`                  | `postgres`      | PostgreSQL user                                                                  |
 | `DB_PASSWORD`              | `postgres`      | PostgreSQL password                                                              |
 | `DB_NAME`                  | `survey_engine` | PostgreSQL database                                                              |
-| `NODE_ENV`                 | `development`   | `production` disables synchronize, enables migrations                            |
+| `DB_SYNCHRONIZE`           | `false`         | When `true`, TypeORM auto-syncs schema from entities. **Local dev only** — destructive on a real DB. Migrations run on startup whenever this is not `true` |
+| `NODE_ENV`                 | `development`   | Controls log verbosity (pino-pretty in dev). No longer governs schema sync       |
 | `PORT`                     | `3000`          | HTTP listen port                                                                 |
 | `CORS_ORIGINS`             | `*`             | Comma-separated allowed origins                                                  |
 | `API_KEY`                  | _(unset)_       | Optional global API key                                                          |

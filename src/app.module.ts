@@ -25,6 +25,12 @@ import { FilesModule } from './files/files.module';
             inject: [ConfigService],
             useFactory: (configService: ConfigService) => {
                 const isDev = configService.get('NODE_ENV') !== 'production';
+                // `synchronize` is opt-in via DB_SYNCHRONIZE=true. Default off
+                // everywhere so a misconfigured NODE_ENV cannot accidentally
+                // let TypeORM rewrite a production schema in place. Local dev
+                // sets DB_SYNCHRONIZE=true in `.env` for the auto-sync workflow.
+                const synchronize =
+                    configService.get<string>('DB_SYNCHRONIZE') === 'true';
                 return {
                     type: 'postgres',
                     host: configService.get('DB_HOST', 'localhost'),
@@ -35,10 +41,10 @@ import { FilesModule } from './files/files.module';
                     entities: [__dirname + '/**/*.entity{.ts,.js}'],
                     migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
                     migrationsTableName: 'migrations',
-                    // In development, synchronize is ON for convenience.
-                    // In production, run `npm run migration:run` before deploying.
-                    synchronize: isDev,
-                    migrationsRun: !isDev,
+                    synchronize,
+                    // Run pending migrations on startup unless `synchronize` is
+                    // managing the schema — they're mutually exclusive.
+                    migrationsRun: !synchronize,
                     logging: isDev,
                 };
             },
