@@ -22,6 +22,7 @@ import {
 import { RequestContext } from '../common/interfaces/request-context.interface';
 import { SurveyVersionsService } from '../surveys/survey-versions.service';
 import { SurveySchema } from '../schema';
+import { ErrorCodes } from '../common/errors/error-codes';
 
 interface FileQuestionRules {
     allowedFileTypes?: string[];
@@ -66,15 +67,22 @@ export class FilesService {
         options: { surveyId?: string; questionId?: string } = {},
     ): Promise<UploadedFile> {
         if (!file) {
-            throw new BadRequestException('No file uploaded');
+            throw new BadRequestException({
+                code: ErrorCodes.INVALID_FILE,
+                message: 'No file uploaded',
+            });
         }
         if (!file.buffer || file.buffer.length === 0) {
-            throw new BadRequestException('Uploaded file is empty');
+            throw new BadRequestException({
+                code: ErrorCodes.INVALID_FILE,
+                message: 'Uploaded file is empty',
+            });
         }
         if (file.size > this.maxFileSizeBytes) {
-            throw new BadRequestException(
-                `File exceeds maximum size of ${this.maxFileSizeBytes} bytes`,
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.FILE_TOO_LARGE,
+                message: `File exceeds maximum size of ${this.maxFileSizeBytes} bytes`,
+            });
         }
 
         const rules = await this.loadQuestionRules(ctx, options);
@@ -109,7 +117,10 @@ export class FilesService {
     async findOne(ctx: RequestContext, id: string): Promise<UploadedFile> {
         const file = await this.fileRepository.findOne({ where: { id } });
         if (!file) {
-            throw new NotFoundException(`File with ID "${id}" not found`);
+            throw new NotFoundException({
+                code: ErrorCodes.FILE_NOT_FOUND,
+                message: `File with ID "${id}" not found`,
+            });
         }
         this.assertAccess(ctx, file);
         return file;
@@ -147,7 +158,10 @@ export class FilesService {
 
     private assertAccess(ctx: RequestContext, file: UploadedFile): void {
         if (file.createdBy && ctx.userId && file.createdBy !== ctx.userId) {
-            throw new ForbiddenException('You do not have access to this file');
+            throw new ForbiddenException({
+                code: ErrorCodes.FORBIDDEN,
+                message: 'You do not have access to this file',
+            });
         }
     }
 
@@ -188,9 +202,10 @@ export class FilesService {
         );
 
         if (!question) {
-            throw new BadRequestException(
-                `Question "${options.questionId}" was not found in survey "${options.surveyId}"`,
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.INVALID_FILE,
+                message: `Question "${options.questionId}" was not found in survey "${options.surveyId}"`,
+            });
         }
 
         return this.extractFileRules(question);
@@ -274,9 +289,10 @@ export class FilesService {
         if (!rules) return;
 
         if (rules.maxFileSize !== undefined && file.size > rules.maxFileSize) {
-            throw new BadRequestException(
-                `File exceeds question maximum size of ${rules.maxFileSize} bytes`,
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.FILE_TOO_LARGE,
+                message: `File exceeds question maximum size of ${rules.maxFileSize} bytes`,
+            });
         }
 
         if (
@@ -288,9 +304,10 @@ export class FilesService {
                 rules.allowedFileTypes,
             )
         ) {
-            throw new BadRequestException(
-                `File type "${file.mimetype}" is not allowed for this question`,
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.FILE_TYPE_NOT_ALLOWED,
+                message: `File type "${file.mimetype}" is not allowed for this question`,
+            });
         }
     }
 

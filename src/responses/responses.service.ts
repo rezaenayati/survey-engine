@@ -25,6 +25,7 @@ import {
     SurveySchema,
     LogicSchema,
 } from '../schema';
+import { ErrorCodes } from '../common/errors/error-codes';
 
 @Injectable()
 export class ResponsesService {
@@ -50,7 +51,10 @@ export class ResponsesService {
         const survey = await this.surveysService.findOne(ctx, dto.surveyId);
 
         if (!survey.activeVersionId) {
-            throw new BadRequestException('Survey has no published version');
+            throw new BadRequestException({
+                code: ErrorCodes.SURVEY_NOT_PUBLISHED,
+                message: 'Survey has no published version',
+            });
         }
 
         const version = await this.versionRepository.findOne({
@@ -58,7 +62,10 @@ export class ResponsesService {
         });
 
         if (!version) {
-            throw new NotFoundException('Active survey version not found');
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: 'Active survey version not found',
+            });
         }
 
         // Persist response + outbox row atomically. A crash between save and
@@ -143,7 +150,10 @@ export class ResponsesService {
         });
 
         if (!response) {
-            throw new NotFoundException(`Response with ID "${id}" not found`);
+            throw new NotFoundException({
+                code: ErrorCodes.RESPONSE_NOT_FOUND,
+                message: `Response with ID "${id}" not found`,
+            });
         }
 
         // Anonymous response: readable by anyone with the UUID (resume-token pattern).
@@ -161,7 +171,10 @@ export class ResponsesService {
             return response;
         }
 
-        throw new ForbiddenException('You do not have access to this response');
+        throw new ForbiddenException({
+            code: ErrorCodes.FORBIDDEN,
+            message: 'You do not have access to this response',
+        });
     }
 
     /**
@@ -175,17 +188,21 @@ export class ResponsesService {
     private assertRespondent(response: Response, ctx: RequestContext): void {
         if (response.respondentId) {
             if (!ctx.userId || response.respondentId !== ctx.userId) {
-                throw new ForbiddenException(
-                    'Only the original respondent can modify this response',
-                );
+                throw new ForbiddenException({
+                    code: ErrorCodes.FORBIDDEN,
+                    message:
+                        'Only the original respondent can modify this response',
+                });
             }
             return;
         }
 
         if (this.strictAuth) {
-            throw new ForbiddenException(
-                'Mutating anonymous responses is disabled in strict mode',
-            );
+            throw new ForbiddenException({
+                code: ErrorCodes.STRICT_AUTH_VIOLATION,
+                message:
+                    'Mutating anonymous responses is disabled in strict mode',
+            });
         }
     }
 
@@ -198,7 +215,10 @@ export class ResponsesService {
         this.assertRespondent(response, ctx);
 
         if (response.status === ResponseStatus.COMPLETED) {
-            throw new BadRequestException('Cannot update a completed response');
+            throw new BadRequestException({
+                code: ErrorCodes.RESPONSE_ALREADY_COMPLETED,
+                message: 'Cannot update a completed response',
+            });
         }
 
         response.answersJson = { ...response.answersJson, ...dto.answersJson };
@@ -215,7 +235,10 @@ export class ResponsesService {
         this.assertRespondent(response, ctx);
 
         if (response.status === ResponseStatus.COMPLETED) {
-            throw new BadRequestException('Response is already completed');
+            throw new BadRequestException({
+                code: ErrorCodes.RESPONSE_ALREADY_COMPLETED,
+                message: 'Response is already completed',
+            });
         }
 
         const version = await this.versionRepository.findOne({
@@ -223,7 +246,10 @@ export class ResponsesService {
         });
 
         if (!version) {
-            throw new NotFoundException('Survey version not found');
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: 'Survey version not found',
+            });
         }
 
         const logicResult = this.logicEngine.evaluateLogic(
@@ -255,6 +281,7 @@ export class ResponsesService {
             missingLogicRequired.length > 0
         ) {
             throw new BadRequestException({
+                code: ErrorCodes.VALIDATION_FAILED,
                 message: 'Response validation failed',
                 errors: visibleQuestionErrors,
                 missingRequired: [
@@ -317,7 +344,10 @@ export class ResponsesService {
         });
 
         if (!version) {
-            throw new NotFoundException('Survey version not found');
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: 'Survey version not found',
+            });
         }
 
         const logicResult = this.logicEngine.evaluateLogic(
@@ -379,7 +409,10 @@ export class ResponsesService {
         });
 
         if (!version) {
-            throw new NotFoundException('Survey version not found');
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: 'Survey version not found',
+            });
         }
 
         const result = this.logicEngine.evaluateLogic(

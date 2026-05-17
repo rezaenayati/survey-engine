@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { ErrorCodes } from '../errors/error-codes';
 
 /**
  * Metadata key for {@link SkipApiKey}-style decorators. Read by both
@@ -55,7 +56,10 @@ export class ApiKeyGuard implements CanActivate {
             (req.headers['x-api-key'] as string | undefined);
 
         if (!providedKey || providedKey !== this.apiKey) {
-            throw new UnauthorizedException('Invalid or missing API key');
+            throw new UnauthorizedException({
+                code: ErrorCodes.INVALID_API_KEY,
+                message: 'Invalid or missing API key',
+            });
         }
 
         return true;

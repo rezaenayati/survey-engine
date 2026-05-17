@@ -2,7 +2,6 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
-    ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +17,7 @@ import {
     SurveySchema,
     LogicSchema,
 } from '../schema';
+import { ErrorCodes } from '../common/errors/error-codes';
 
 @Injectable()
 export class SurveyVersionsService {
@@ -31,31 +31,22 @@ export class SurveyVersionsService {
         private readonly logicEngine: LogicEngineService,
     ) {}
 
-    /**
-     * Throw 403 when a resource belongs to a specific user and the caller is a
-     * different user. Anonymous callers and ownerless resources are allowed so
-     * the service keeps working in deployments without an auth gateway.
-     */
-    private assertOwner(survey: Survey, ctx: RequestContext): void {
-        if (survey.createdBy && ctx.userId && survey.createdBy !== ctx.userId) {
-            throw new ForbiddenException(
-                'You do not have access to this survey',
-            );
-        }
-    }
-
     async publish(ctx: RequestContext, id: string): Promise<Survey> {
         const survey = await this.surveysService.findOne(ctx, id);
-        this.assertOwner(survey, ctx);
+        this.surveysService.assertOwner(survey, ctx);
 
         if (survey.status === SurveyStatus.ARCHIVED) {
-            throw new BadRequestException('Cannot publish an archived survey');
+            throw new BadRequestException({
+                code: ErrorCodes.SURVEY_ARCHIVED,
+                message: 'Cannot publish an archived survey',
+            });
         }
 
         if (!survey.draftSchemaJson) {
-            throw new BadRequestException(
-                'Cannot publish survey without a schema',
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.INVALID_SCHEMA,
+                message: 'Cannot publish survey without a schema',
+            });
         }
 
         const schemaValidation = this.schemaValidator.validateSchema(
@@ -63,6 +54,7 @@ export class SurveyVersionsService {
         );
         if (!schemaValidation.valid) {
             throw new BadRequestException({
+                code: ErrorCodes.INVALID_SCHEMA,
                 message: 'Cannot publish: Invalid survey schema',
                 errors: schemaValidation.errors,
             });
@@ -75,6 +67,7 @@ export class SurveyVersionsService {
             );
             if (!logicValidation.valid) {
                 throw new BadRequestException({
+                    code: ErrorCodes.INVALID_LOGIC,
                     message: 'Cannot publish: Invalid logic rules',
                     errors: logicValidation.errors,
                 });
@@ -120,7 +113,7 @@ export class SurveyVersionsService {
         surveyId: string,
     ): Promise<SurveyVersion[]> {
         const survey = await this.surveysService.findOne(ctx, surveyId);
-        this.assertOwner(survey, ctx);
+        this.surveysService.assertOwner(survey, ctx);
 
         return this.versionRepository.find({
             where: { surveyId },
@@ -134,14 +127,17 @@ export class SurveyVersionsService {
         versionId: string,
     ): Promise<SurveyVersion> {
         const survey = await this.surveysService.findOne(ctx, surveyId);
-        this.assertOwner(survey, ctx);
+        this.surveysService.assertOwner(survey, ctx);
 
         const version = await this.versionRepository.findOne({
             where: { id: versionId, surveyId },
         });
 
         if (!version)
-            throw new NotFoundException(`Version "${versionId}" not found`);
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: `Version "${versionId}" not found`,
+            });
 
         return version;
     }
@@ -155,17 +151,25 @@ export class SurveyVersionsService {
         });
 
         if (!survey)
-            throw new NotFoundException(
-                `Survey with ID "${surveyId}" not found`,
-            );
+            throw new NotFoundException({
+                code: ErrorCodes.SURVEY_NOT_FOUND,
+                message: `Survey with ID "${surveyId}" not found`,
+            });
         if (!survey.activeVersionId)
-            throw new BadRequestException('Survey has no published version');
+            throw new BadRequestException({
+                code: ErrorCodes.SURVEY_NOT_PUBLISHED,
+                message: 'Survey has no published version',
+            });
 
         const version = await this.versionRepository.findOne({
             where: { id: survey.activeVersionId },
         });
 
-        if (!version) throw new NotFoundException('Active version not found');
+        if (!version)
+            throw new NotFoundException({
+                code: ErrorCodes.VERSION_NOT_FOUND,
+                message: 'Active version not found',
+            });
 
         return version;
     }
@@ -181,7 +185,7 @@ export class SurveyVersionsService {
         logicErrors: string[];
     }> {
         const survey = await this.surveysService.findOne(ctx, id);
-        this.assertOwner(survey, ctx);
+        this.surveysService.assertOwner(survey, ctx);
 
         let schemaValid = false;
         let logicValid = true;

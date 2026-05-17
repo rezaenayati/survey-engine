@@ -13,6 +13,7 @@ import {
     StoreFileInput,
     StoredFile,
 } from './file-storage.interface';
+import { ErrorCodes } from '../../common/errors/error-codes';
 
 @Injectable()
 export class S3FileStorage implements FileStorage {
@@ -23,9 +24,10 @@ export class S3FileStorage implements FileStorage {
     constructor(config: ConfigService) {
         const bucket = config.get<string>('S3_BUCKET');
         if (!bucket) {
-            throw new BadRequestException(
-                'S3_BUCKET is required when FILE_STORAGE_DRIVER=s3',
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.MISCONFIGURED,
+                message: 'S3_BUCKET is required when FILE_STORAGE_DRIVER=s3',
+            });
         }
 
         this.bucket = bucket;
@@ -69,7 +71,10 @@ export class S3FileStorage implements FileStorage {
         );
 
         if (!result.Body) {
-            throw new BadRequestException('Stored file has no body');
+            throw new BadRequestException({
+                code: ErrorCodes.INTERNAL_ERROR,
+                message: 'Stored file has no body',
+            });
         }
 
         return {
@@ -108,6 +113,9 @@ export class S3FileStorage implements FileStorage {
             return stream;
         }
 
-        throw new BadRequestException('Stored file body is not readable');
+        throw new BadRequestException({
+            code: ErrorCodes.INTERNAL_ERROR,
+            message: 'Stored file body is not readable',
+        });
     }
 }

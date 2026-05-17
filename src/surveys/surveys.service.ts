@@ -18,6 +18,7 @@ import {
     LogicEngineService,
     SurveySchema,
 } from '../schema';
+import { ErrorCodes } from '../common/errors/error-codes';
 
 @Injectable()
 export class SurveysService {
@@ -45,17 +46,20 @@ export class SurveysService {
     assertOwner(survey: Survey, ctx: RequestContext): void {
         if (survey.createdBy) {
             if (!ctx.userId || survey.createdBy !== ctx.userId) {
-                throw new ForbiddenException(
-                    'You do not have access to this survey',
-                );
+                throw new ForbiddenException({
+                    code: ErrorCodes.FORBIDDEN,
+                    message: 'You do not have access to this survey',
+                });
             }
             return;
         }
 
         if (this.strictAuth) {
-            throw new ForbiddenException(
-                'Mutating anonymous surveys is disabled in strict mode',
-            );
+            throw new ForbiddenException({
+                code: ErrorCodes.STRICT_AUTH_VIOLATION,
+                message:
+                    'Mutating anonymous surveys is disabled in strict mode',
+            });
         }
     }
 
@@ -69,7 +73,10 @@ export class SurveysService {
     async findOneVisible(ctx: RequestContext, id: string): Promise<Survey> {
         const survey = await this.findOne(ctx, id);
         if (this.canSee(survey, ctx)) return survey;
-        throw new NotFoundException(`Survey with ID "${id}" not found`);
+        throw new NotFoundException({
+            code: ErrorCodes.SURVEY_NOT_FOUND,
+            message: `Survey with ID "${id}" not found`,
+        });
     }
 
     private canSee(survey: Survey, ctx: RequestContext): boolean {
@@ -85,6 +92,7 @@ export class SurveysService {
             );
             if (!schemaValidation.valid) {
                 throw new BadRequestException({
+                    code: ErrorCodes.INVALID_SCHEMA,
                     message: 'Invalid survey schema',
                     errors: schemaValidation.errors,
                 });
@@ -98,6 +106,7 @@ export class SurveysService {
             );
             if (!logicValidation.valid) {
                 throw new BadRequestException({
+                    code: ErrorCodes.INVALID_LOGIC,
                     message: 'Invalid logic rules',
                     errors: logicValidation.errors,
                 });
@@ -165,7 +174,10 @@ export class SurveysService {
         });
 
         if (!survey)
-            throw new NotFoundException(`Survey with ID "${id}" not found`);
+            throw new NotFoundException({
+                code: ErrorCodes.SURVEY_NOT_FOUND,
+                message: `Survey with ID "${id}" not found`,
+            });
 
         return survey;
     }
@@ -179,7 +191,10 @@ export class SurveysService {
         this.assertOwner(survey, ctx);
 
         if (survey.status === SurveyStatus.ARCHIVED) {
-            throw new BadRequestException('Cannot update an archived survey');
+            throw new BadRequestException({
+                code: ErrorCodes.SURVEY_ARCHIVED,
+                message: 'Cannot update an archived survey',
+            });
         }
 
         if (dto.schemaJson !== undefined) {
@@ -188,6 +203,7 @@ export class SurveysService {
             );
             if (!schemaValidation.valid) {
                 throw new BadRequestException({
+                    code: ErrorCodes.INVALID_SCHEMA,
                     message: 'Invalid survey schema',
                     errors: schemaValidation.errors,
                 });
@@ -208,6 +224,7 @@ export class SurveysService {
             );
             if (!logicValidation.valid) {
                 throw new BadRequestException({
+                    code: ErrorCodes.INVALID_LOGIC,
                     message: 'Invalid logic rules',
                     errors: logicValidation.errors,
                 });

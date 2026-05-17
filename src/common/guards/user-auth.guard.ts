@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { UserTokenError, verifyUserToken } from '../auth/user-token';
+import { ErrorCodes } from '../errors/error-codes';
 import { SKIP_API_KEY } from './api-key.guard';
 
 /**
@@ -73,11 +74,13 @@ export class UserAuthGuard implements CanActivate {
                 );
                 req.verifiedUserId = verified.userId;
             } catch (err) {
-                throw new UnauthorizedException(
-                    err instanceof UserTokenError
-                        ? `Invalid X-User-Token (${err.code})`
-                        : 'Invalid X-User-Token',
-                );
+                throw new UnauthorizedException({
+                    code: ErrorCodes.INVALID_USER_TOKEN,
+                    message:
+                        err instanceof UserTokenError
+                            ? `Invalid X-User-Token (${err.code})`
+                            : 'Invalid X-User-Token',
+                });
             }
         }
 
@@ -88,10 +91,12 @@ export class UserAuthGuard implements CanActivate {
             hasUserIdHeader &&
             !tokenHeader
         ) {
-            throw new UnauthorizedException(
-                'STRICT_AUTH with USER_TOKEN_SECRET set: identity must be ' +
+            throw new UnauthorizedException({
+                code: ErrorCodes.STRICT_AUTH_VIOLATION,
+                message:
+                    'STRICT_AUTH with USER_TOKEN_SECRET set: identity must be ' +
                     'forwarded via a signed X-User-Token, not X-User-ID.',
-            );
+            });
         }
 
         // Strict-auth, token mode off: X-User-ID requires API_KEY to be configured
@@ -102,11 +107,13 @@ export class UserAuthGuard implements CanActivate {
             hasUserIdHeader &&
             !this.apiKeyConfigured
         ) {
-            throw new UnauthorizedException(
-                'STRICT_AUTH is enabled but API_KEY is not configured; ' +
+            throw new UnauthorizedException({
+                code: ErrorCodes.STRICT_AUTH_VIOLATION,
+                message:
+                    'STRICT_AUTH is enabled but API_KEY is not configured; ' +
                     'X-User-ID cannot be trusted without an authenticated caller. ' +
                     'Either set API_KEY and have callers send it, or remove X-User-ID.',
-            );
+            });
         }
 
         return true;

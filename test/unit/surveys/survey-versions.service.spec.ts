@@ -1,6 +1,10 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+} from '@nestjs/common';
 import { SurveyVersionsService } from '../../../src/surveys/survey-versions.service';
 import { SurveysService } from '../../../src/surveys/surveys.service';
 import { Survey } from '../../../src/surveys/entities/survey.entity';
@@ -45,12 +49,25 @@ describe('SurveyVersionsService', () => {
     let service: SurveyVersionsService;
     let surveyRepo: ReturnType<typeof mockRepo>;
     let versionRepo: ReturnType<typeof mockRepo>;
-    let surveysService: { findOne: jest.Mock };
+    let surveysService: { findOne: jest.Mock; assertOwner: jest.Mock };
 
     beforeEach(async () => {
         surveyRepo = mockRepo();
         versionRepo = mockRepo();
-        surveysService = { findOne: jest.fn() };
+        surveysService = {
+            findOne: jest.fn(),
+            // Mirrors the real SurveysService.assertOwner hybrid policy.
+            assertOwner: jest.fn((survey, c) => {
+                if (
+                    survey.createdBy &&
+                    (!c.userId || survey.createdBy !== c.userId)
+                ) {
+                    throw new ForbiddenException(
+                        'You do not have access to this survey',
+                    );
+                }
+            }),
+        };
 
         const module = await Test.createTestingModule({
             providers: [

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { SurveysService } from '../surveys/surveys.service';
 import { RequestContext } from '../common/interfaces/request-context.interface';
+import { ErrorCodes } from '../common/errors/error-codes';
 import { AggregationService } from './aggregation.service';
 import { QuestionAnalyticsService } from './question-analytics.service';
 import { ExportService } from './export.service';
@@ -34,9 +35,10 @@ export class AnalyticsService {
         this.surveysService.assertOwner(survey, ctx);
 
         if (query.versionMode === VersionMode.SPECIFIC && !query.versionId) {
-            throw new BadRequestException(
-                'versionId is required when versionMode is "specific"',
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.BAD_REQUEST,
+                message: 'versionId is required when versionMode is "specific"',
+            });
         }
 
         const versions =

@@ -8,6 +8,7 @@ import {
     StoreFileInput,
     StoredFile,
 } from './file-storage.interface';
+import { ErrorCodes } from '../../common/errors/error-codes';
 
 @Injectable()
 export class FirebaseFileStorage implements FileStorage {
@@ -17,9 +18,11 @@ export class FirebaseFileStorage implements FileStorage {
     constructor(config: ConfigService) {
         const bucketName = config.get<string>('FIREBASE_STORAGE_BUCKET');
         if (!bucketName) {
-            throw new BadRequestException(
-                'FIREBASE_STORAGE_BUCKET is required when FILE_STORAGE_DRIVER=firebase',
-            );
+            throw new BadRequestException({
+                code: ErrorCodes.MISCONFIGURED,
+                message:
+                    'FIREBASE_STORAGE_BUCKET is required when FILE_STORAGE_DRIVER=firebase',
+            });
         }
         this.bucketName = bucketName;
         this.publicBaseUrl =
