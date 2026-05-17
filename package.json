@@ -1,6 +1,6 @@
 {
   "name": "survey-engine",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Survey Engine — a standalone SurveyJS-compatible survey service",
   "author": "enayatii.reza@gmail.com",
   "private": true,
