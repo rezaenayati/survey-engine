@@ -21,8 +21,6 @@ interface SummaryRaw {
     total: string;
     completed: string;
     avg_time: string | null;
-}
-interface MedianRaw {
     median_time: string | null;
 }
 interface StatusCountRaw {
@@ -97,29 +95,18 @@ export class AggregationService {
         qb: SelectQueryBuilder<Response>,
         versionsIncluded: number[],
     ): Promise<AnalyticsSummaryDto> {
+        // Postgres allows FILTER on the PERCENTILE_CONT ordered-set aggregate, so
+        // total/completed/avg/median fall out of one query — no separate subquery
+        // and no regex rewriting of the QueryBuilder's generated SQL.
+        const completedFilter = `FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}' AND r.completedAt IS NOT NULL)`;
         const result = await qb
             .select([
                 'COUNT(*)::int as total',
                 `COUNT(*) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}')::int as completed`,
-                `AVG(EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) FILTER (WHERE r.status = '${ResponseStatus.COMPLETED}' AND r.completedAt IS NOT NULL) as avg_time`,
+                `AVG(EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) ${completedFilter} as avg_time`,
+                `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) ${completedFilter} as median_time`,
             ])
             .getRawOne<SummaryRaw>();
-
-        const medianResult = await this.responseRepository
-            .createQueryBuilder('r')
-            .select(
-                `PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (r.completedAt - r.startedAt))) as median_time`,
-            )
-            .where(
-                qb
-                    .getQuery()
-                    .replace(/SELECT.*FROM/, 'r.id IN (SELECT r.id FROM'),
-            )
-            .andWhere(`r.status = '${ResponseStatus.COMPLETED}'`)
-            .andWhere('r.completedAt IS NOT NULL')
-            .setParameters(qb.getParameters())
-            .getRawOne<MedianRaw>()
-            .catch((): MedianRaw => ({ median_time: null }));
 
         const statusCounts = await qb
             .clone()
@@ -161,7 +148,7 @@ export class AggregationService {
                 parseFloat(result.avg_time ?? '0') || 0,
             ),
             medianCompletionTime: Math.round(
-                parseFloat(medianResult?.median_time ?? '0') || 0,
+                parseFloat(result.median_time ?? '0') || 0,
             ),
             responsesByStatus,
             responsesToday: parseInt(periodCounts?.today, 10) || 0,

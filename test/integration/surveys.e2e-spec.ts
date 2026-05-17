@@ -180,6 +180,7 @@ describe('Surveys API (e2e)', () => {
 
             const res = await request(app.getHttpServer())
                 .get(`/surveys/${surveyId}`)
+                .set('X-User-ID', 'user-1')
                 .expect(200);
 
             expect(res.body.id).toBe(surveyId);

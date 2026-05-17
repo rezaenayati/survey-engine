@@ -294,6 +294,51 @@ describe('AggregationService', () => {
 
             expect(result.versionsIncluded).toEqual([1, 2, 3]);
         });
+
+        it('returns median_time from the main aggregate (no separate query)', async () => {
+            const qb = createQbMock();
+            (qb.getRawOne as jest.Mock)
+                .mockResolvedValueOnce({
+                    total: '10',
+                    completed: '8',
+                    avg_time: '60',
+                    median_time: '45',
+                })
+                .mockResolvedValueOnce({ today: '2', this_week: '5' });
+            (qb.getRawMany as jest.Mock).mockResolvedValueOnce([]);
+
+            const result = await service.calculateSummaryDB(qb, [1]);
+
+            expect(result.medianCompletionTime).toBe(45);
+            // Two getRawOne calls total: the main aggregate, then period counts.
+            // (Was three before — a separate median subquery has been collapsed in.)
+            expect(qb.getRawOne).toHaveBeenCalledTimes(2);
+        });
+
+        it('selects median in the same SELECT as the other aggregates', async () => {
+            const qb = createQbMock();
+            (qb.getRawOne as jest.Mock)
+                .mockResolvedValueOnce({
+                    total: '1',
+                    completed: '1',
+                    avg_time: '30',
+                    median_time: '30',
+                })
+                .mockResolvedValueOnce({ today: '0', this_week: '1' });
+            (qb.getRawMany as jest.Mock).mockResolvedValueOnce([]);
+
+            await service.calculateSummaryDB(qb, [1]);
+
+            const firstSelect = (qb.select as jest.Mock).mock.calls[0][0] as
+                | string[]
+                | string;
+            const joined = Array.isArray(firstSelect)
+                ? firstSelect.join(' ')
+                : firstSelect;
+            expect(joined).toMatch(/PERCENTILE_CONT/);
+            expect(joined).toMatch(/median_time/);
+            expect(joined).toMatch(/COUNT\(\*\)/);
+        });
     });
 
     // ── calculateFunnelDB ─────────────────────────────────────────────────────
