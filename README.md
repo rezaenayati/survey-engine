@@ -189,11 +189,12 @@ Content-Type: application/json
 { "name": "Customer Feedback", "schemaJson": { ... } }
 ```
 
-| Header             | Required              | Description                                                                                  |
-| ------------------ | --------------------- | -------------------------------------------------------------------------------------------- |
-| `X-User-ID`        | No                    | Authenticated user ID — stored as `createdBy` / `respondentId` and used for ownership checks |
-| `X-Correlation-ID` | No                    | Trace ID forwarded through logs                                                              |
-| `X-API-Key`        | When `API_KEY` is set | Global API key (see Security below)                                                          |
+| Header             | Required                       | Description                                                                                       |
+| ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `X-User-ID`        | No                             | Authenticated user ID — stored as `createdBy` / `respondentId` and used for ownership checks      |
+| `X-User-Token`     | When `USER_TOKEN_SECRET` is set | HS256-signed JWT (`sub` = userId). Verified server-side; takes priority over `X-User-ID`         |
+| `X-Correlation-ID` | No                             | Trace ID forwarded through logs                                                                   |
+| `X-API-Key`        | When `API_KEY` is set          | Global API key (see Security below)                                                               |
 
 Requests without `X-User-ID` are accepted as anonymous.
 
@@ -279,7 +280,35 @@ STRICT_AUTH=true
 With this combination, a misconfigured deployment fails closed instead of silently
 allowing an attacker to set `X-User-ID: <victim>` and act as that user.
 
-See [`SECURITY.md`](SECURITY.md#trust-contract) for the full trust contract.
+### Signed user tokens — cryptographically authenticated identity
+
+For the strongest trust story, set `USER_TOKEN_SECRET` and have callers forward an
+HS256-signed JWT in `X-User-Token`. The engine verifies the signature itself, so it
+doesn't need to trust the caller's claim about who the user is — just the token's
+cryptography.
+
+```bash
+# .env
+USER_TOKEN_SECRET=replace-with-a-long-random-secret-at-least-32-bytes
+```
+
+Mint tokens on your backend with any JWT library:
+
+```typescript
+import jwt from 'jsonwebtoken';
+
+const token = jwt.sign(
+  { sub: user.id },
+  process.env.USER_TOKEN_SECRET!,
+  { algorithm: 'HS256', expiresIn: '15m' },
+);
+
+await surveyEngine.surveys.create({ ... }); // SDK sends X-User-Token automatically
+```
+
+Combine `USER_TOKEN_SECRET=<secret>` with `STRICT_AUTH=true` for production: `X-User-ID`
+is rejected entirely, and only signed tokens are honored. See
+[`SECURITY.md`](SECURITY.md#trust-contract) for the full trust contract.
 
 ### Webhooks
 
@@ -417,6 +446,7 @@ Conditional logic (`visibleIf`, `enableIf`, `requiredIf`) embedded directly in t
 | `CORS_ORIGINS`             | `*`             | Comma-separated allowed origins                                                  |
 | `API_KEY`                  | _(unset)_       | Optional global API key                                                          |
 | `STRICT_AUTH`              | `false`         | When `true`, requests carrying `X-User-ID` must also pass the `API_KEY` check    |
+| `USER_TOKEN_SECRET`        | _(unset)_       | When set, accepts HS256-signed JWTs in `X-User-Token` for verified user identity |
 | `WEBHOOK_SECRET`           | _(unset)_       | Global HMAC-SHA256 secret for webhook signing (per-survey secret takes priority) |
 | `FILE_STORAGE_DRIVER`      | `local`         | File storage driver: `local`, `s3`, or `firebase`                                |
 | `FILE_LOCAL_DIR`           | `uploads`       | Local storage directory relative to the process working directory                |

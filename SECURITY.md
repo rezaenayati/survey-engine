@@ -50,15 +50,16 @@ The following are **out of scope**:
 
 ## Trust Contract
 
-Survey Engine does **not** perform user authentication itself. It uses two headers to
-implement the contract that its callers must enforce:
+Survey Engine does **not** perform user authentication itself. Identity arrives via one of
+three headers — pick the one that matches your threat model:
 
-| Header        | Purpose                                                            | Trusted because…                                                            |
-| ------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| `X-User-ID`   | Identifies the acting user; drives ownership and attribution.      | The deployer's gateway authenticates the user *before* forwarding the header. |
-| `X-API-Key` / `Authorization: Bearer` | Authenticates the *caller* (typically a backend). | The shared secret is known only to authorised services.                     |
+| Header                                | Purpose                                                       | Trusted because…                                                                |
+| ------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `X-User-ID`                           | Identifies the acting user; drives ownership and attribution. | The deployer's gateway authenticates the user *before* forwarding the header.   |
+| `X-User-Token`                        | Same purpose, cryptographically signed.                       | An HS256 JWT signed with `USER_TOKEN_SECRET` — the engine verifies the signature itself. |
+| `X-API-Key` / `Authorization: Bearer` | Authenticates the *caller* (typically a backend).             | The shared secret is known only to authorised services.                         |
 
-Three deployment shapes that satisfy the contract:
+Four deployment shapes that satisfy the contract:
 
 1. **Behind a trusted gateway, no `API_KEY`.** The engine is on an internal network; the
    only thing that can reach it is your own BFF, which has already verified the user. The
@@ -74,9 +75,38 @@ Three deployment shapes that satisfy the contract:
    leaks the engine to the open internet. Without it, an attacker who can reach the
    engine directly can set `X-User-ID: <victim>` and act as that user.
 
+4. **Signed user tokens (`USER_TOKEN_SECRET` set).** Callers mint an HS256 JWT with
+   `sub = userId` and forward it as `X-User-Token`. The engine verifies the signature
+   itself, so no separate trust assumption about the caller is needed. With
+   `STRICT_AUTH=true`, `X-User-ID` is rejected entirely — only signed tokens are honored
+   — so a misconfigured deployment cannot fall back to the trusting mode.
+
 Anything that doesn't match one of these shapes — for example, an internet-reachable
-engine with no `API_KEY` — is a misconfiguration and a vulnerability against this threat
-model.
+engine with no `API_KEY` and no `USER_TOKEN_SECRET` — is a misconfiguration and a
+vulnerability against this threat model.
+
+### Minting user tokens
+
+Tokens are standard HS256 JWTs. With `jsonwebtoken` on your backend:
+
+```typescript
+import jwt from 'jsonwebtoken';
+
+const token = jwt.sign(
+  { sub: user.id },                            // userId goes in `sub`
+  process.env.USER_TOKEN_SECRET!,              // same secret the engine has
+  { algorithm: 'HS256', expiresIn: '15m' },
+);
+
+await fetch(`${SURVEY_ENGINE_URL}/surveys`, {
+  headers: { 'X-User-Token': token, 'X-API-Key': process.env.SURVEY_ENGINE_API_KEY! },
+  // ...
+});
+```
+
+The engine verifies the signature, checks `exp` (with ±60s clock skew), and uses `sub` as
+the userId for ownership and attribution. Invalid signatures, expired tokens, missing
+`sub`, and non-HS256 algorithms are all rejected with `401`.
 
 ## Other Security Notes
 

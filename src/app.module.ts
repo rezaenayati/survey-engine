@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ApiKeyGuard } from './common/guards/api-key.guard';
+import { UserAuthGuard } from './common/guards/user-auth.guard';
 import { LoggerModule } from 'nestjs-pino';
 import { SurveysModule } from './surveys/surveys.module';
 import { ResponsesModule } from './responses/responses.module';
@@ -82,8 +83,10 @@ import { FilesModule } from './files/files.module';
         HealthModule,
     ],
     providers: [
-        // API key guard runs first; inactive when API_KEY env var is not set
+        // Caller auth (API key) runs first; inactive when API_KEY is unset.
         { provide: APP_GUARD, useClass: ApiKeyGuard },
+        // User-identity auth: verifies X-User-Token and enforces STRICT_AUTH rules.
+        { provide: APP_GUARD, useClass: UserAuthGuard },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
 })

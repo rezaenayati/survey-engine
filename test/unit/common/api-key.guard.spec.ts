@@ -28,19 +28,18 @@ describe('ApiKeyGuard', () => {
         process.env = { ...ORIGINAL_ENV };
     });
 
-    describe('without API_KEY and without STRICT_AUTH (default)', () => {
+    describe('without API_KEY', () => {
         beforeEach(() => {
             delete process.env.API_KEY;
-            delete process.env.STRICT_AUTH;
         });
 
-        it('allows requests with no X-User-ID', () => {
+        it('allows any request when no API_KEY is configured', () => {
             const guard = new ApiKeyGuard(reflector);
             const ctx = makeContext({ path: '/surveys', headers: {} });
             expect(guard.canActivate(ctx)).toBe(true);
         });
 
-        it('allows requests carrying X-User-ID (trusted-gateway mode)', () => {
+        it('allows requests carrying X-User-ID without challenge', () => {
             const guard = new ApiKeyGuard(reflector);
             const ctx = makeContext({
                 path: '/surveys',
@@ -53,7 +52,6 @@ describe('ApiKeyGuard', () => {
     describe('with API_KEY set', () => {
         beforeEach(() => {
             process.env.API_KEY = 'secret';
-            delete process.env.STRICT_AUTH;
         });
 
         it('rejects requests without a key', () => {
@@ -94,57 +92,11 @@ describe('ApiKeyGuard', () => {
             const ctx = makeContext({ path: '/health', headers: {} });
             expect(guard.canActivate(ctx)).toBe(true);
         });
-    });
 
-    describe('with STRICT_AUTH=true', () => {
-        beforeEach(() => {
-            process.env.STRICT_AUTH = 'true';
-        });
-
-        it('rejects X-User-ID when API_KEY is unset', () => {
-            delete process.env.API_KEY;
-            const guard = new ApiKeyGuard(reflector);
-            const ctx = makeContext({
-                path: '/surveys',
-                headers: { 'x-user-id': 'alice' },
-            });
-            expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
-        });
-
-        it('still allows requests without X-User-ID when API_KEY is unset', () => {
-            delete process.env.API_KEY;
+        it('skips the check when @SkipApiKey() is applied', () => {
+            jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
             const guard = new ApiKeyGuard(reflector);
             const ctx = makeContext({ path: '/surveys', headers: {} });
-            expect(guard.canActivate(ctx)).toBe(true);
-        });
-
-        it('requires both API_KEY and X-User-ID to be present together', () => {
-            process.env.API_KEY = 'secret';
-            const guard = new ApiKeyGuard(reflector);
-            const ctx = makeContext({
-                path: '/surveys',
-                headers: { 'x-user-id': 'alice', 'x-api-key': 'secret' },
-            });
-            expect(guard.canActivate(ctx)).toBe(true);
-        });
-
-        it('rejects X-User-ID when API_KEY is set but missing from request', () => {
-            process.env.API_KEY = 'secret';
-            const guard = new ApiKeyGuard(reflector);
-            const ctx = makeContext({
-                path: '/surveys',
-                headers: { 'x-user-id': 'alice' },
-            });
-            expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
-        });
-
-        it('still exempts /health', () => {
-            delete process.env.API_KEY;
-            const guard = new ApiKeyGuard(reflector);
-            const ctx = makeContext({
-                path: '/health',
-                headers: { 'x-user-id': 'alice' },
-            });
             expect(guard.canActivate(ctx)).toBe(true);
         });
     });

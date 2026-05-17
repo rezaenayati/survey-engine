@@ -27,6 +27,13 @@ export interface SurveyEngineClientOptions {
      */
     userId?: string;
     /**
+     * Optional HS256-signed JWT forwarded as X-User-Token. When the engine is
+     * configured with USER_TOKEN_SECRET, it verifies the signature and uses the
+     * token's `sub` claim as the userId — taking priority over `userId`. Mint
+     * server-side with any JWT library using the same shared secret.
+     */
+    userToken?: string;
+    /**
      * Optional global API key when the server has API_KEY set — sent as X-API-Key.
      */
     apiKey?: string;
@@ -130,6 +137,9 @@ class BaseClient {
 
         if (this.options.userId) {
             headers['X-User-ID'] = this.options.userId;
+        }
+        if (this.options.userToken) {
+            headers['X-User-Token'] = this.options.userToken;
         }
         if (this.options.apiKey) {
             headers['X-API-Key'] = this.options.apiKey;
